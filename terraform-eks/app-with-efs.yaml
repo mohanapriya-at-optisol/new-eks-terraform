@@ -1,0 +1,87 @@
+---
+# PersistentVolumeClaim for EFS
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: efs-claim
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: efs-sc
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysampleapp
+  labels:
+    app: mysampleapp
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: mysampleapp
+  template:
+    metadata:
+      labels:
+        app: mysampleapp
+        env: mysamplelable
+    spec:
+      containers:
+      - name: mycontainer
+        image: priya18082004/myimage:latest
+        ports:
+        - containerPort: 5000
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 512Mi
+          limits:
+            cpu: 1500m
+            memory: 1Gi
+        volumeMounts:
+        - name: efs-storage
+          mountPath: /data  # Mount path inside container
+      volumes:
+      - name: efs-storage
+        persistentVolumeClaim:
+          claimName: efs-claim
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysampleapp-service
+  labels:
+    app: mysampleapp
+spec:
+  type: NodePort
+  selector:
+    app: mysampleapp
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 5000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mysampleapp-ingress
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+spec:
+  ingressClassName: alb
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: mysampleapp-service
+            port:
+              number: 80
