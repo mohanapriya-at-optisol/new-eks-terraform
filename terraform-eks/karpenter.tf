@@ -5,15 +5,10 @@ module "eks_karpenter" {
   cluster_name = module.eks.cluster_name
   
   
-  create_instance_profile = true
+  create_instance_profile = var.instance_profile
   
   
-  node_iam_role_additional_policies = {
-    AmazonSSMManagedInstanceCore = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-    AmazonEKSWorkerNodePolicy = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
-    AmazonEC2ContainerRegistryReadOnly = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
-    AmazonEKS_CNI_Policy = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
-  }
+  node_iam_role_additional_policies = var.node_iam_role_additional_policies
   depends_on = [module.eks]
 }
 resource "kubernetes_namespace" "karpenter_na" {
@@ -51,71 +46,10 @@ resource "aws_iam_policy" "karpenter_controller_policy" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "ec2:CreateFleet",
-          "ec2:CreateLaunchTemplate",
-          "ec2:CreateTags",
-          "ec2:DescribeAvailabilityZones",
-          "ec2:DescribeImages",
-          "ec2:DescribeInstances",
-          "ec2:DescribeInstanceTypeOfferings",
-          "ec2:DescribeInstanceTypes",
-          "ec2:DescribeLaunchTemplates",
-          "ec2:DescribeSecurityGroups",
-          "ec2:DescribeSpotPriceHistory",
-          "ec2:DescribeSubnets",
-          "ec2:DeleteLaunchTemplate",
-          "ec2:RunInstances",
-          "ec2:TerminateInstances"
-        ]
-        Resource = "*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "iam:PassRole"
-        ]
-        Resource = module.eks_karpenter.node_iam_role_arn
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "eks:DescribeCluster"
-        ]
-        Resource = module.eks.cluster_arn
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "iam:GetInstanceProfile"
-        ]
-        Resource = "*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "pricing:GetProducts"
-        ]
-        Resource = "*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "ssm:GetParameter"
-        ]
-        Resource = "arn:aws:ssm:*:*:parameter/aws/service/*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "sqs:DeleteMessage",
-          "sqs:GetQueueAttributes",
-          "sqs:GetQueueUrl",
-          "sqs:ReceiveMessage"
-        ]
-        Resource = module.eks_karpenter.queue_arn
+      for statement in var.karpenter_controller_policy_statements : {
+        Effect = statement.Effect
+        Action = statement.Action
+        Resource = statement.Resource == "NODE_IAM_ROLE_ARN" ? module.eks_karpenter.node_iam_role_arn : statement.Resource == "CLUSTER_ARN" ? module.eks.cluster_arn : statement.Resource == "QUEUE_ARN" ? module.eks_karpenter.queue_arn : statement.Resource
       }
     ]
   })

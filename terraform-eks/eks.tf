@@ -4,10 +4,10 @@ module "eks" {
   version = "21.3.1"
   
   name               = local.cluster_name
-  kubernetes_version = "1.31"
-  endpoint_public_access = true
-  endpoint_private_access = true
-  enable_cluster_creator_admin_permissions = true
+  kubernetes_version = var.kubernetes_version
+  endpoint_public_access = var.enable_eks_public_access
+  endpoint_private_access = var.enable_eks_private_access
+  enable_cluster_creator_admin_permissions = var.enable_admin_permissions
   addons = {
     coredns                = {}
     eks-pod-identity-agent = {
@@ -23,14 +23,14 @@ module "eks" {
   subnet_ids = module.vpc.private_subnets
   control_plane_subnet_ids = module.vpc.intra_subnets
   
-  enable_irsa = true
+  enable_irsa = var.irsa
   
   # Custom KMS key alias to avoid conflicts
   kms_key_aliases = ["${local.cluster_name}-kms-alias"]
   
   #EKS MANAGED NODE GROUP
   eks_managed_node_groups = {
-    karpenter-mng-example = {
+    "${local.cluster_name}-mng-example" = {
       ami_type       = var.node_ami_type
       instance_types = [var.node_instance_type]
  

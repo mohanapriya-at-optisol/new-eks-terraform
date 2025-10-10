@@ -7,6 +7,42 @@ variable "region_name"{
 variable "aws_account_id"{
     type = string
 }
+variable "vpc_cidr"{
+    type = string
+}
+variable "public_subnets_range"{
+    type = list(string)
+}
+variable "private_subnets_range"{
+    type = list(string)
+}
+variable "intra_subnets_range"{
+    type = list(string)
+}
+variable "nat_gateway"{
+    type = bool
+}   
+variable "single_nat_gateway"{
+    type = bool
+}
+variable "one_nat_gateway_per_az"{
+    type = bool
+}
+variable "enable_dns_support"{
+    type = bool
+}
+variable "enable_eks_public_access"{
+    type = bool
+}
+variable "enable_eks_private_access"{
+    type = bool
+}
+variable "enable_admin_permissions"{
+    type = bool
+}
+variable "irsa"{
+    type = bool
+}
 variable "node_instance_type"{
     type = string
 }
@@ -30,4 +66,40 @@ variable "max_mng_size"{
 variable "desired_mng_size"{
     type = number
 }
+variable "instance_profile"{
+    type = bool
+}
 
+variable "node_iam_role_additional_policies" {
+  type        = map(string)
+  description = "Additional IAM policies to attach to the Karpenter node IAM role"
+}
+
+variable "karpenter_controller_policy_statements" {
+  type = list(object({
+    Effect   = string
+    Action   = list(string)
+    Resource = string
+  }))
+  description = "IAM policy statements for Karpenter controller"
+}
+variable "karpenter_capacity_types" {
+  type = list(string)
+}
+variable "karpenter_instance_types" {
+  type = list(string)
+}
+variable "karpenter_cpu_limit" {
+  type = number
+}
+variable "karpenter_ttl_seconds_after_empty" {
+  type = number
+}
+
+variable "kubernetes_version" {
+  type        = string
+  description = "EKS cluster Kubernetes version"
+}
+
+
+  

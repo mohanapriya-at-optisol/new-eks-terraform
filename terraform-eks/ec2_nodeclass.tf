@@ -11,16 +11,16 @@ resource "kubectl_manifest" "karpenter_provisioner" {
       requirements:
         - key: "karpenter.sh/capacity-type"
           operator: In
-          values: ["on-demand"]
+          values: ${jsonencode(var.karpenter_capacity_types)}
         - key: "node.kubernetes.io/instance-type"
           operator: In
-          values: ["m5.large", "m5.xlarge", "m5.2xlarge", "c5.large", "c5.xlarge", "r5.large", "r5.xlarge"]
+          values: ${jsonencode(var.karpenter_instance_types)}
       limits:
         resources:
-          cpu: 1000
+          cpu: ${var.karpenter_cpu_limit}
       providerRef:
         name: default
-      ttlSecondsAfterEmpty: 30
+      ttlSecondsAfterEmpty: ${var.karpenter_ttl_seconds_after_empty}
   YAML
 }
 

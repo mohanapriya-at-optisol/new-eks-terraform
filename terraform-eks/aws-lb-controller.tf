@@ -280,7 +280,7 @@ resource "aws_iam_role_policy_attachment" "aws_load_balancer_controller" {
 # Kubernetes Service Account for AWS Load Balancer Controller
 resource "kubernetes_service_account" "aws_load_balancer_controller" {
   metadata {
-    name      = "aws-load-balancer-controller"
+    name      = "${local.cluster_name}-aws-load-balancer-controller-sa"
     namespace = "kube-system"
     annotations = {
       "eks.amazonaws.com/role-arn" = aws_iam_role.aws_load_balancer_controller.arn
