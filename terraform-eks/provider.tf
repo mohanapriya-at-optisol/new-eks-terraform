@@ -1,12 +1,5 @@
 terraform {
-  backend "s3" {
-    bucket         = "testing-my-state-bucket-08-10-2025"
-    key            = "terraform.tfstate"
-    region         = "ap-south-1"
-    encrypt        = true
-    dynamodb_table = "testing-terraform-locks"
-    profile        = "tf-admin"
-  }
+  backend "s3" {}
 
   required_providers {
     aws = {
