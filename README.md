@@ -1,8 +1,8 @@
-**EKS Terraform Infrastructure Guide**
+# EKS Terraform Infrastructure Guide
 
 This project automates the creation of an Amazon EKS (Elastic Kubernetes Service) cluster with autoscaling, load balancing, and persistent storage using Terraform.
 
-**📌 What This Code Creates**
+# 📌 What This Code Creates
 
 **EKS Cluster:** Managed Kubernetes control plane
 
@@ -20,7 +20,8 @@ This project automates the creation of an Amazon EKS (Elastic Kubernetes Service
 
 You can use this cluster to deploy containerized applications with high availability and persistent storage.
 
-**🔧 Prerequisites**
+# 🔧 Prerequisites
+
 **1. Software**
 - AWS CLI (v2)
 - Terraform (v1.0+)
@@ -33,7 +34,7 @@ Admin access with a configured AWS CLI profile (example: tf-admin)
 aws configure --profile tf-admin
 #Enter Access Key, Secret Key, Default Region (e.g., ap-south-1), and Output (json)
 
-📁** File Structure Overview and Purpose**
+# 📁 File Structure Overview and Purpose
 
 terraform-eks/
 
@@ -91,7 +92,7 @@ terraform-eks/
 
 **Edit envs/.tfvars to your scenario**
 
-**🚀 Deployment Steps**
+# 🚀 Deployment Steps
 
 **1. Prepare Environment**
 
@@ -135,17 +136,17 @@ kubectl get ingress             # Get load balancer URL
 
 **7. Monitor & Logs**
 
-# Cluster metrics
+Cluster metrics
 
 kubectl top nodes
 
 kubectl top pods
 
-# Karpenter logs
+Karpenter logs
 
 kubectl logs -f -n dev-karpenter-namespace deployment/dev-karpenter
 
-# Check all system pods
+ Check all system pods
 
 kubectl get pods -n kube-system
 
