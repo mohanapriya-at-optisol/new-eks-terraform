@@ -1,5 +1,5 @@
 locals {
-  cluster_name = "${var.environment}-cluster"
+  cluster_name = var.cluster_name
   vpc_name     = "${var.environment}-vpc"
   karpenter_namespace = "${var.environment}-karpenter-namespace"
   karpenter_controller_role_name = "${var.environment}-kc-role"
