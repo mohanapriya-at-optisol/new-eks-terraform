@@ -3,8 +3,8 @@ module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "21.3.1"
   
-  name               = local.cluster_name
-  kubernetes_version = var.kubernetes_version
+  name               = var.cluster_name
+  kubernetes_version = var.cluster_version
   endpoint_public_access = var.enable_eks_public_access
   endpoint_private_access = var.enable_eks_private_access
   enable_cluster_creator_admin_permissions = var.enable_admin_permissions
@@ -26,22 +26,33 @@ module "eks" {
   enable_irsa = var.irsa
   
   # Custom KMS key alias to avoid conflicts
-  kms_key_aliases = ["${local.cluster_name}-kms-alias"]
+  kms_key_aliases = ["${local.cluster_name}-kms-alias-version2"]
+  
+  # Apply tags to EKS cluster
+  tags = var.tags
   
   #EKS MANAGED NODE GROUP
   eks_managed_node_groups = {
-    "${local.cluster_name}-mng-example" = {
+    "${var.node_group_name}" = {
       ami_type       = var.node_ami_type
       instance_types = [var.node_instance_type]
  
-      min_size     = var.min_mng_size
-      max_size     = var.max_mng_size
-      desired_size = var.desired_mng_size
+      min_size     = var.min_size
+      max_size     = var.max_size
+      desired_size = var.desired_size
+      
+      disk_size = var.disk_size  # Uses 50GB from your tfvars
+      
+      # Apply tags to managed node group
+      tags = merge(var.tags, {
+        Name = "${var.cluster_name}-mng-nodes"
+      })
     }
   }
-   security_group_tags = {
-    "karpenter.sh/discovery" = local.cluster_name 
-  }
+   security_group_tags = merge(var.tags, {
+    "karpenter.sh/discovery" = local.cluster_name
+    Name = "${var.cluster_name}-cluster-sg"
+  })
    security_group_additional_rules = {
     ingress_nodes_ephemeral_ports_tcp = {
       description                = "Nodes on ephemeral ports"
@@ -52,9 +63,10 @@ module "eks" {
       source_node_security_group = true
     }
   }
-   node_security_group_tags = {
+   node_security_group_tags = merge(var.tags, {
     "karpenter.sh/discovery" = local.cluster_name
-  }
+    Name = "${var.cluster_name}-node-sg"
+  })
  
   node_security_group_additional_rules = {
     # Allow all traffic between nodes for services like CoreDNS and cross-pod communication
