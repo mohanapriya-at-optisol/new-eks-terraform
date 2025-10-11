@@ -35,17 +35,28 @@ aws configure --profile tf-admin
 
 📁** File Structure Overview and Purpose**
 terraform-eks/
-├── envs/dev.tfvars          # Cluster settings
+├── envs/dev.tfvars    # Cluster settings
+
 ├── backend-config/dev.tfbackend  # Terraform state backend
+
 ├── eks.tf                   # EKS cluster
+
 ├── vpc.tf                   # Networking
+
 ├── karpenter.tf             # Node autoscaling
+
 ├── alb-controller.tf        # Load balancer
+
 ├── efs.tf                   # Persistent storage
+
 ├── ec2nodeclass.tf          # Node configuration for Karpenter
+
 ├── provider.tf              # AWS provider config
+
 ├── output.tf                # Output values
+
 ├── app-efs.yaml             # Sample application using EFS
+
 └── setup-backend-fixed.sh   # Bootstrap script
 
 **envs/dev.tfvars** – Stores environment-specific variables like region, cluster name, and node settings.
