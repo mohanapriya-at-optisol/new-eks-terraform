@@ -1,5 +1,5 @@
-bucket         = "dev-karpenter-bucket-10-10-25"
+bucket         = "dev-eks-state-buc-11-10"
 key            = "terraform.tfstate"
 region         = "ap-south-1"
-dynamodb_table = "dev-terraform-locks"
+dynamodb_table = "dev0ek"
 encrypt        = true
