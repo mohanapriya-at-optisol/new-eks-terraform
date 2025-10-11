@@ -136,23 +136,24 @@ kubectl get ingress             # Get load balancer URL
 
 **7. Monitor & Logs**
 
-Cluster metrics
+**Cluster metrics**
 
 kubectl top nodes
 
 kubectl top pods
 
-Karpenter logs
+**Karpenter logs**
 
 kubectl logs -f -n dev-karpenter-namespace deployment/dev-karpenter
 
- Check all system pods
+**Check all system pods**
 
 kubectl get pods -n kube-system
 
 **8. Cleanup**
 
 **Delete Everything**
+
 kubectl delete -f app-efs.yaml
 
 terraform destroy -var-file="envs/dev.tfvars"
