@@ -186,4 +186,3 @@ resource "kubernetes_storage_class" "efs" {
 
   depends_on = [helm_release.efs_csi_driver]
 }
-
