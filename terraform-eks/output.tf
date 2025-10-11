@@ -57,4 +57,3 @@ output "efs_dns_name" {
   description = "EFS DNS name for mounting"
   value       = aws_efs_file_system.eks.dns_name
 }
-
