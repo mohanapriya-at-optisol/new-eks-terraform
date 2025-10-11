@@ -1,49 +1,61 @@
-variable "environment"{
+variable "environment" {
     type = string
 }
-variable "region_name"{
+variable "region_name" {
     type = string
 }
-variable "aws_account_id"{
+variable "aws_account_id" {
     type = string
 }
-variable "vpc_cidr"{
+variable "vpc_cidr" {
     type = string
 }
-variable "public_subnets_range"{
+variable "azs"{
     type = list(string)
 }
-variable "private_subnets_range"{
+variable "public_subnets_range" {
     type = list(string)
 }
-variable "intra_subnets_range"{
+variable "private_subnets_range" {
     type = list(string)
 }
-variable "nat_gateway"{
-    type = bool
-}   
-variable "single_nat_gateway"{
+variable "intra_subnets_range" {
+    type = list(string)
+}
+variable "nat_gateway" {
     type = bool
 }
-variable "one_nat_gateway_per_az"{
+variable "single_nat_gateway" {
     type = bool
 }
-variable "enable_dns_support"{
+variable "one_nat_gateway_per_az" {
     type = bool
 }
-variable "enable_eks_public_access"{
+variable "enable_dns_support" {
     type = bool
 }
-variable "enable_eks_private_access"{
+variable "cluster_name"{
+    type = string
+}
+variable "cluster_version"{
+    type = string
+}
+variable "enable_eks_public_access" {
     type = bool
 }
-variable "enable_admin_permissions"{
+variable "enable_eks_private_access" {
     type = bool
 }
-variable "irsa"{
+variable "enable_admin_permissions" {
     type = bool
 }
-variable "node_instance_type"{
+variable "irsa" {
+    type = bool
+}
+variable "node_group_name"{
+    type = string
+}
+variable "node_instance_type" {
     type = string
 }
 variable "node_ami_type" {
@@ -57,16 +69,19 @@ variable "node_ami_type" {
     error_message = "node_ami_type must be one of: AL2_x86_64, AL2_x86_64_GPU, AL2_ARM_64, or AL2023_x86_64_STANDARD."
   }
 }
-variable "min_mng_size"{
+variable "min_size" {
     type = number
 }
-variable "max_mng_size"{
+variable "max_size" {
     type = number
 }
-variable "desired_mng_size"{
+variable "desired_size" {
     type = number
 }
-variable "instance_profile"{
+variable "disk_size"{
+    type = number
+}
+variable "instance_profile" {
     type = bool
 }
 
@@ -95,11 +110,9 @@ variable "karpenter_cpu_limit" {
 variable "karpenter_ttl_seconds_after_empty" {
   type = number
 }
-
-variable "kubernetes_version" {
-  type        = string
-  description = "EKS cluster Kubernetes version"
+variable "tags" {
+  type        = map(string)
 }
 
 
-  
+
