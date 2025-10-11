@@ -92,37 +92,66 @@ terraform-eks/
 **Edit envs/.tfvars to your scenario**
 
 **🚀 Deployment Steps**
+
 **1. Prepare Environment**
+
 cd terraform-eks
+
 chmod +x setup-backend-fixed.sh  # Linux/Mac only
+
 aws sts get-caller-identity --profile tf-admin  # Verify credentials
+
 **2. Run Bootstrap Script**
+
 ./setup-backend-fixed.sh --environment dev --region ap-south-1 --profile tf-admin
+
 ./setup-backend-fixed.sh --environment test --region ap-south-1 --profile tf-admin
+
 **3. Review Config**
+
 envs/.tfvars notepad # Update settings if needed
+
 **4. Plan & Apply**
+
 terraform plan -var-file="envs/dev.tfvars"  # Check what will be created
+
 terraform apply -var-file="envs/dev.tfvars" # Deploy infrastructure
+
 **5. Configure kubectl**
+
 aws eks update-kubeconfig --region ap-south-1 --name dev-new-eks-karpenter --profile tf-admin
+
 kubectl get nodes  # Verify cluster
+
 **6. Deploy Sample Application**
+
 kubectl apply -f app-efs.yaml  # Deploy sample app using EFS
+
 kubectl get pods                # Check pod status
+
 kubectl get services            # Check service
+
 kubectl get ingress             # Get load balancer URL
+
 **7. Monitor & Logs**
+
 # Cluster metrics
+
 kubectl top nodes
+
 kubectl top pods
 
 # Karpenter logs
+
 kubectl logs -f -n dev-karpenter-namespace deployment/dev-karpenter
 
 # Check all system pods
+
 kubectl get pods -n kube-system
+
 **8. Cleanup**
+
 **Delete Everything**
 kubectl delete -f app-efs.yaml
+
 terraform destroy -var-file="envs/dev.tfvars"
