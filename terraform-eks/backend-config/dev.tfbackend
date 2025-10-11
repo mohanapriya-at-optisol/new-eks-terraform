@@ -1,4 +1,4 @@
-bucket         = "new-s3-12-10-state-buc"
+bucket         = "new-s3-state-bucket-2025"
 key            = "terraform.tfstate"
 region         = "ap-south-1"
 dynamodb_table = "dev0ek"
