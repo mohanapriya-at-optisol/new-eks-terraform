@@ -10,7 +10,17 @@ CREATED_FILES=()
 
 # Cleanup function
 cleanup() {
-  echo "\n⚠️  Script interrupted! Cleaning up created resources..."
+  local exit_code=$?
+  
+  # If script completed successfully, clear tracking variables and exit
+  if [ $exit_code -eq 0 ]; then
+    CREATED_BUCKET=""
+    CREATED_DDB_TABLE=""
+    CREATED_FILES=()
+    return
+  fi
+  
+  echo "\n⚠️  Script failed or interrupted! Cleaning up created resources..."
   
   # Delete created S3 bucket
   if [ -n "$CREATED_BUCKET" ]; then
@@ -36,11 +46,11 @@ cleanup() {
   done
   
   echo "🧹 Cleanup completed"
-  exit 1
+  exit $exit_code
 }
 
-# Set trap for cleanup on interruption
-trap cleanup SIGINT SIGTERM
+# Set trap for cleanup on interruption, termination, and any exit
+trap cleanup SIGINT SIGTERM EXIT
 
 # Defaults
 ENVIRONMENT=""
