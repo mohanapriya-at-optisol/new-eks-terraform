@@ -1,0 +1,19 @@
+name: Terraform Deploy
+
+on:
+  repository_dispatch:
+    types: [bootstrap_completed]
+
+jobs:
+  terraform:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Terraform Plan
+        run: terraform plan -var-file="envs/${{ github.event.client_payload.environment }}.tfvars" -out=tfplan.out
+
+      - name: Terraform Apply
+        run: terraform apply -var-file="envs/${{ github.event.client_payload.environment }}.tfvars" -auto-approve
