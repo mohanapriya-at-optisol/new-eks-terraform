@@ -34,6 +34,7 @@ aws configure --profile tf-admin
 #Enter Access Key, Secret Key, Default Region (e.g., ap-south-1), and Output (json)
 
 📁** File Structure Overview and Purpose**
+
 terraform-eks/
 ├── envs/dev.tfvars    # Cluster settings
 
