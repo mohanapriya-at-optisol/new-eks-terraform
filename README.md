@@ -36,6 +36,7 @@ aws configure --profile tf-admin
 📁** File Structure Overview and Purpose**
 
 terraform-eks/
+
 ├── envs/dev.tfvars    # Cluster settings
 
 ├── backend-config/dev.tfbackend  # Terraform state backend
