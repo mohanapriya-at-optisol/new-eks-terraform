@@ -6,7 +6,8 @@ on:
 
 jobs:
   terraform:
-    runs-on: self-hosted
+    runs-on: [self-hosted,linux, x64]
+
 
     steps:
 
