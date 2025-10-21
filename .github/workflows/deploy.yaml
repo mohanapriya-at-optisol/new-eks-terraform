@@ -7,15 +7,16 @@ on:
 jobs:
   terraform:
     runs-on: [self-hosted,linux, x64]
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_DEFAULT_REGION: ${{secrets.AWS_DEFAULT_REGION}}
+    
+    
 
     steps:
 
       - name: Terraform Plan
         run: |
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{secrets.AWS_DEFAULT_REGION}}
           terraform plan \
             -var-file="static.tfvars" \
             -var-file="envs/${{ github.event.client_payload.environment }}.tfvars" \
@@ -24,6 +25,9 @@ jobs:
 
       - name: Terraform Apply
         run: |
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{secrets.AWS_DEFAULT_REGION}}
           terraform apply \
             -var-file="static.tfvars" \
             -var-file="envs/${{ github.event.client_payload.environment }}.tfvars" \
