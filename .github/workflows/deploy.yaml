@@ -6,30 +6,102 @@ on:
 
 jobs:
   terraform:
-    runs-on: [self-hosted,linux, x64]
+    runs-on: [self-hosted, linux, x64]
     
-    
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+      TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
 
     steps:
 
+      - name: Verify AWS Credentials
+        run: |
+          echo "🔍 Verifying AWS credentials..."
+          aws sts get-caller-identity
+          echo "✅ AWS credentials validated"
+          
+          echo "🔍 Checking EKS permissions..."
+          if aws eks list-clusters --region ${{ secrets.AWS_DEFAULT_REGION }} >/dev/null 2>&1; then
+            echo "✅ EKS permissions validated"
+          else
+            echo "⚠️ Warning: EKS list failed - may need additional permissions"
+          fi
+
+      - name: Initialize Terraform Backend
+        run: |
+          echo "🚀 Re-initializing Terraform backend for CI environment..."
+          
+          # Check if backend config exists
+          if [ ! -f "backend-config/${{ github.event.client_payload.environment }}.tfbackend" ]; then
+            echo "❌ Backend config not found: backend-config/${{ github.event.client_payload.environment }}.tfbackend"
+            exit 1
+          fi
+          
+          # Check if environment vars file exists
+          if [ ! -f "envs/${{ github.event.client_payload.environment }}.tfvars" ]; then
+            echo "❌ Environment vars file not found: envs/${{ github.event.client_payload.environment }}.tfvars"
+            exit 1
+          fi
+          
+          # Re-initialize terraform (needed because this is a fresh CI environment)
+          terraform init -backend-config="backend-config/${{ github.event.client_payload.environment }}.tfbackend"
+          
+          # Select the workspace (should already exist from local setup)
+          echo "📂 Selecting workspace: ${{ github.event.client_payload.environment }}"
+          terraform workspace select ${{ github.event.client_payload.environment }}
+        working-directory: ${{ github.event.client_payload.repo_path }}
+
+      - name: Terraform Validate
+        run: |
+          echo "🔍 Validating Terraform configuration..."
+          terraform validate
+        working-directory: ${{ github.event.client_payload.repo_path }}
+
       - name: Terraform Plan
         run: |
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{secrets.AWS_DEFAULT_REGION}}
+          echo "📋 Running Terraform plan..."
           terraform plan \
-            -var-file="static.tfvars" \
             -var-file="envs/${{ github.event.client_payload.environment }}.tfvars" \
-            -out=tfplan.out
+            -out=tfplan.out \
+            -detailed-exitcode
         working-directory: ${{ github.event.client_payload.repo_path }}
 
       - name: Terraform Apply
         run: |
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{secrets.AWS_DEFAULT_REGION}}
+          echo "🚀 Applying Terraform changes..."
           terraform apply \
-            -var-file="static.tfvars" \
-            -var-file="envs/${{ github.event.client_payload.environment }}.tfvars" \
-            -auto-approve
+            -auto-approve \
+            tfplan.out
         working-directory: ${{ github.event.client_payload.repo_path }}
+
+      - name: Output EKS Cluster Info
+        run: |
+          echo "🎉 EKS Cluster deployment completed!"
+          echo "📊 Terraform outputs:"
+          terraform output
+          
+          # Save outputs to file
+          terraform output -json > cluster-outputs.json
+          echo "💾 Outputs saved to cluster-outputs.json"
+        working-directory: ${{ github.event.client_payload.repo_path }}
+
+      - name: Upload Terraform Outputs
+        uses: actions/upload-artifact@v3
+        with:
+          name: terraform-outputs-${{ github.event.client_payload.environment }}
+          path: ${{ github.event.client_payload.repo_path }}/cluster-outputs.json
+
+      - name: Deployment Summary
+        run: |
+          echo "## 🎉 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ github.event.client_payload.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Region:** ${{ secrets.AWS_DEFAULT_REGION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workspace:** ${{ github.event.client_payload.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ✅ Successfully deployed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Terraform Outputs" >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          cat ${{ github.event.client_payload.repo_path }}/cluster-outputs.json >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
