@@ -27,6 +27,23 @@ jobs:
           aws sts get-caller-identity
           echo "✅ AWS credentials validated"
 
+      - name: Ensure tf-admin AWS profile
+        run: |
+          # Check if tf-admin profile already exists
+          if aws configure list-profiles | grep -q '^tf-admin$'; then
+            echo "✅ tf-admin profile already exists. Using existing profile."
+          else
+            echo "🔧 tf-admin profile not found. Creating from GitHub secrets..."
+            aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID --profile tf-admin
+            aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY --profile tf-admin
+            aws configure set region $AWS_DEFAULT_REGION --profile tf-admin
+            echo "✅ tf-admin profile created successfully."
+          fi
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+
       - name: Initialize Terraform Backend
         run: |
           echo "🚀 Initializing Terraform backend..."
