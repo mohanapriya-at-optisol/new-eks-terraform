@@ -37,22 +37,33 @@ jobs:
       - name: Initialize Terraform Backend
         run: |
           echo "🚀 Re-initializing Terraform backend for CI environment..."
+          echo "📂 Working in directory: ${{ github.event.client_payload.repo_path }}"
+          
+          # List directory contents for debugging
+          echo "📋 Directory contents:"
+          ls -la
           
           # Check if backend config exists
           if [ ! -f "backend-config/${{ github.event.client_payload.environment }}.tfbackend" ]; then
             echo "❌ Backend config not found: backend-config/${{ github.event.client_payload.environment }}.tfbackend"
+            echo "📋 Contents of backend-config directory:"
+            ls -la backend-config/ || echo "backend-config directory does not exist"
             exit 1
           fi
           
           # Check if static vars file exists
           if [ ! -f "static.tfvars" ]; then
             echo "❌ Static vars file not found: static.tfvars"
+            echo "📋 Looking for .tfvars files:"
+            find . -name "*.tfvars" -type f || echo "No .tfvars files found"
             exit 1
           fi
           
           # Check if environment vars file exists
           if [ ! -f "envs/${{ github.event.client_payload.environment }}.tfvars" ]; then
             echo "❌ Environment vars file not found: envs/${{ github.event.client_payload.environment }}.tfvars"
+            echo "📋 Contents of envs directory:"
+            ls -la envs/ || echo "envs directory does not exist"
             exit 1
           fi
           
