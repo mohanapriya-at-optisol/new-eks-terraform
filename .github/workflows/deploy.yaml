@@ -15,13 +15,6 @@ jobs:
       TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.5.0
 
       - name: Verify AWS Credentials
         run: |
