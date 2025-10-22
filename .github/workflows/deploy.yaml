@@ -32,24 +32,20 @@ jobs:
           echo "🚀 Initializing Terraform backend..."
           cd ${{ github.event.client_payload.repo_path }}
 
-          # Validate backend and variable files
-          if [ ! -f "backend-config/${{ github.event.client_payload.environment }}.tfbackend" ]; then
-            echo "❌ Missing backend config: backend-config/${{ github.event.client_payload.environment }}.tfbackend"
-            exit 1
-          fi
+          # Check required files
+          for file in backend-config/${{ github.event.client_payload.environment }}.tfbackend static.tfvars envs/${{ github.event.client_payload.environment }}.tfvars; do
+            if [ ! -f "$file" ]; then
+              echo "❌ Missing required file: $file"
+              exit 1
+            fi
+          done
 
-          if [ ! -f "static.tfvars" ]; then
-            echo "❌ Missing static vars file: static.tfvars"
-            exit 1
-          fi
-
-          if [ ! -f "envs/${{ github.event.client_payload.environment }}.tfvars" ]; then
-            echo "❌ Missing environment vars file: envs/${{ github.event.client_payload.environment }}.tfvars"
-            exit 1
-          fi
-
+          # Initialize Terraform
           terraform init -backend-config="backend-config/${{ github.event.client_payload.environment }}.tfbackend"
+
+          # Select or create workspace
           terraform workspace select ${{ github.event.client_payload.environment }} || terraform workspace new ${{ github.event.client_payload.environment }}
+
           echo "✅ Terraform initialized successfully."
         working-directory: ${{ github.event.client_payload.repo_path }}
 
@@ -63,51 +59,17 @@ jobs:
       - name: Terraform Plan
         run: |
           echo "📋 Running Terraform plan..."
-
-          # Allow plan to exit with non-zero without breaking the workflow
-          set +e
           terraform plan \
             -var-file="static.tfvars" \
             -var-file="envs/${{ github.event.client_payload.environment }}.tfvars" \
             -out=tfplan.out
-          PLAN_EXIT_CODE=$?
-          set -e
-
-          echo "🔍 Terraform plan exited with code: $PLAN_EXIT_CODE"
-
-          # Handle exit codes properly
-          case $PLAN_EXIT_CODE in
-            0)
-              echo "✅ No infrastructure changes required."
-              ;;
-            2)
-              echo "⚙️ Infrastructure changes detected — will apply them next."
-              ;;
-            1)
-              echo "❌ Terraform plan failed!"
-              exit 1
-              ;;
-            *)
-              echo "⚠️ Unexpected Terraform plan exit code: $PLAN_EXIT_CODE"
-              exit 1
-              ;;
-          esac
-
-          # Save plan exit code to a file for next step
-          echo "$PLAN_EXIT_CODE" > plan_exit_code.txt
+          echo "✅ Terraform plan completed."
         working-directory: ${{ github.event.client_payload.repo_path }}
 
       - name: Terraform Apply
         run: |
           echo "🚀 Applying Terraform changes..."
           export TF_LOG=INFO
-
-          PLAN_EXIT_CODE=$(cat plan_exit_code.txt)
-          if [ "$PLAN_EXIT_CODE" -eq 0 ]; then
-            echo "✅ No changes to apply. Skipping terraform apply."
-            exit 0
-          fi
-
           terraform apply -auto-approve tfplan.out
           echo "✅ Terraform apply completed successfully!"
         working-directory: ${{ github.event.client_payload.repo_path }}
