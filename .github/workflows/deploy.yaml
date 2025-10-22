@@ -96,11 +96,34 @@ jobs:
             exit 1
           fi
           
+          # Run terraform plan and handle exit codes properly
+          set +e  # Don't exit on non-zero exit codes
           terraform plan \
             -var-file="static.tfvars" \
             -var-file="envs/${{ github.event.client_payload.environment }}.tfvars" \
             -out=tfplan.out \
             -detailed-exitcode
+          
+          PLAN_EXIT_CODE=$?
+          set -e  # Re-enable exit on error
+          
+          # Handle terraform plan exit codes
+          case $PLAN_EXIT_CODE in
+            0)
+              echo "✅ Terraform plan completed - No changes needed"
+              ;;
+            1)
+              echo "❌ Terraform plan failed with errors"
+              exit 1
+              ;;
+            2)
+              echo "✅ Terraform plan completed - Changes detected and ready to apply"
+              ;;
+            *)
+              echo "❌ Terraform plan failed with unexpected exit code: $PLAN_EXIT_CODE"
+              exit 1
+              ;;
+          esac
         working-directory: ${{ github.event.client_payload.repo_path }}
 
       - name: Terraform Apply
@@ -109,24 +132,45 @@ jobs:
           set -e
           
           # Enable detailed logging
-          export TF_LOG=INFO
+          export TF_LOG=DEBUG
+          export TF_LOG_PATH="terraform-apply.log"
           
-          # Run terraform apply with better error handling
+          # Run terraform apply with comprehensive error handling
+          echo "⏰ Starting terraform apply at $(date)"
+          echo "📊 Plan summary:"
+          terraform show -no-color tfplan.out | head -20
+          
           if ! terraform apply \
             -auto-approve \
-            -parallelism=10 \
-            tfplan.out; then
-            echo "❌ Terraform apply failed!"
-            echo "📋 Checking Terraform state..."
-            terraform state list || true
-            echo "📋 Last few lines of terraform log:"
-            tail -50 terraform.log || true
+            -parallelism=5 \
+            -refresh=true \
+            tfplan.out 2>&1 | tee terraform-output.log; then
+            
+            echo ""
+            echo "❌ Terraform apply failed at $(date)!"
+            echo ""
+            echo "📋 Checking current Terraform state..."
+            terraform state list || echo "No state found"
+            echo ""
+            echo "📋 Last 100 lines of terraform output:"
+            tail -100 terraform-output.log || echo "No output log found"
+            echo ""
+            echo "📋 Checking for specific error patterns:"
+            grep -i "error\|failed\|timeout\|denied\|limit\|quota" terraform-output.log | tail -20 || echo "No obvious error patterns found"
+            echo ""
+            echo "📋 Terraform debug log (last 50 lines):"
+            tail -50 terraform-apply.log || echo "No debug log found"
+            echo ""
+            echo "📋 AWS CloudTrail events (checking for permission errors):"
+            aws logs describe-log-groups --region ${{ secrets.AWS_DEFAULT_REGION }} --limit 3 || echo "Cannot access CloudWatch logs"
+            
             exit 1
           fi
           
-          echo "✅ Terraform apply completed successfully!"
+          echo ""
+          echo "✅ Terraform apply completed successfully at $(date)!"
         working-directory: ${{ github.event.client_payload.repo_path }}
-        timeout-minutes: 60
+        timeout-minutes: 120
 
       - name: Output EKS Cluster Info
         run: |
