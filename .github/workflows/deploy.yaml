@@ -15,91 +15,75 @@ jobs:
       TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
 
     steps:
-      
-
       - name: Verify Project Directory
         run: |
-          echo "📂 Project directory: ${{ github.event.client_payload.repo_path }}"
+          echo "📂 Verifying project directory: ${{ github.event.client_payload.repo_path }}"
           ls -la ${{ github.event.client_payload.repo_path }}
+          echo "✅ Project directory verified"
 
       - name: Verify AWS Credentials
         run: |
-          echo "🔍 AWS identity:"
+          echo "🔍 Verifying AWS credentials..."
           aws sts get-caller-identity
-          echo "🔍 Checking EKS access..."
-          if aws eks list-clusters --region ${{ secrets.AWS_DEFAULT_REGION }} >/dev/null 2>&1; then
-            echo "✅ EKS permissions validated"
-          else
-            echo "⚠️ EKS list failed - may need additional permissions"
-          fi
+          echo "✅ AWS credentials validated"
 
       - name: Initialize Terraform Backend
-        working-directory: ${{ github.event.client_payload.repo_path }}
         run: |
-          echo "🚀 Initializing Terraform..."
-          terraform init -backend-config="backend-config/${{ github.event.client_payload.environment }}.tfbackend"
-          terraform workspace select ${{ github.event.client_payload.environment }}
+          echo "🚀 Initializing Terraform backend..."
+          cd ${{ github.event.client_payload.repo_path }}
 
-      - name: Terraform Validate
-        working-directory: ${{ github.event.client_payload.repo_path }}
-        run: |
-          echo "🔍 Validating Terraform configuration..."
-          terraform validate
-
-      - name: Terraform Plan
-        working-directory: ${{ github.event.client_payload.repo_path }}
-        run: |
-          echo "📋 Running Terraform plan..."
-          set +e
-          terraform plan \
-            -var-file="static.tfvars" \
-            -var-file="envs/${{ github.event.client_payload.environment }}.tfvars" \
-            -out=tfplan.out \
-            -detailed-exitcode
-          PLAN_EXIT_CODE=$?
-          set -e
-
-          case $PLAN_EXIT_CODE in
-            0)
-              echo "✅ Terraform plan: No changes needed"
-              ;;
-            2)
-              echo "✅ Terraform plan: Changes detected"
-              ;;
-            1)
-              echo "❌ Terraform plan failed!"
-              exit 1
-              ;;
-            *)
-              echo "❌ Unexpected terraform plan exit code: $PLAN_EXIT_CODE"
-              exit 1
-              ;;
-          esac
-
-      - name: Terraform Apply
-        working-directory: ${{ github.event.client_payload.repo_path }}
-        run: |
-          echo "🚀 Applying Terraform changes..."
-          export TF_LOG=DEBUG
-          export TF_LOG_PATH="terraform-apply.log"
-
-          if ! terraform apply -auto-approve -parallelism=5 tfplan.out 2>&1 | tee terraform-output.log; then
-            echo "❌ Terraform apply failed!"
-            tail -50 terraform-output.log
-            tail -50 terraform-apply.log
+          # Check backend and variable files
+          if [ ! -f "backend-config/${{ github.event.client_payload.environment }}.tfbackend" ]; then
+            echo "❌ Missing backend config: backend-config/${{ github.event.client_payload.environment }}.tfbackend"
             exit 1
           fi
 
+          if [ ! -f "static.tfvars" ]; then
+            echo "❌ Missing static vars file: static.tfvars"
+            exit 1
+          fi
+
+          if [ ! -f "envs/${{ github.event.client_payload.environment }}.tfvars" ]; then
+            echo "❌ Missing environment vars file: envs/${{ github.event.client_payload.environment }}.tfvars"
+            exit 1
+          fi
+
+          terraform init -backend-config="backend-config/${{ github.event.client_payload.environment }}.tfbackend"
+          terraform workspace select ${{ github.event.client_payload.environment }} || terraform workspace new ${{ github.event.client_payload.environment }}
+          echo "✅ Terraform initialized successfully."
+        working-directory: ${{ github.event.client_payload.repo_path }}
+
+      - name: Terraform Validate
+        run: |
+          terraform validate
+        working-directory: ${{ github.event.client_payload.repo_path }}
+
+      - name: Terraform Plan
+        run: |
+          echo "📋 Running Terraform plan..."
+          terraform plan \
+            -var-file="static.tfvars" \
+            -var-file="envs/${{ github.event.client_payload.environment }}.tfvars" \
+            -out=tfplan.out
+          echo "✅ Terraform plan completed successfully."
+        working-directory: ${{ github.event.client_payload.repo_path }}
+
+      - name: Terraform Apply
+        run: |
+          echo "🚀 Applying Terraform changes..."
+          export TF_LOG=INFO
+          terraform apply -auto-approve tfplan.out
           echo "✅ Terraform apply completed successfully!"
+        working-directory: ${{ github.event.client_payload.repo_path }}
+        timeout-minutes: 120
 
       - name: Output EKS Cluster Info
-        working-directory: ${{ github.event.client_payload.repo_path }}
         run: |
-          echo "🎉 Terraform outputs:"
+          echo "🎉 EKS Cluster deployment completed!"
           terraform output
+        working-directory: ${{ github.event.client_payload.repo_path }}
 
       - name: Deployment Summary
-        working-directory: ${{ github.event.client_payload.repo_path }}
         run: |
           echo "## 🎉 Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "- **Environment:** ${{ github.event.client_payload.environment }}" >> $GITHUB_STEP_SUMMARY
@@ -111,3 +95,4 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           terraform output >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
+        working-directory: ${{ github.event.client_payload.repo_path }}
