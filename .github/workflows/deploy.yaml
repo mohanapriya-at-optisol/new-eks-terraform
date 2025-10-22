@@ -73,8 +73,8 @@ jobs:
         run: |
           echo "🚀 Applying Terraform changes..."
           terraform apply \
-            -auto-approve \
-            tfplan.out
+            tfplan.out\
+            --auto-approve
         working-directory: ${{ github.event.client_payload.repo_path }}
 
       - name: Output EKS Cluster Info
