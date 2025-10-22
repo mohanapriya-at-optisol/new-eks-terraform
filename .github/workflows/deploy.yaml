@@ -32,7 +32,7 @@ jobs:
           echo "🚀 Initializing Terraform backend..."
           cd ${{ github.event.client_payload.repo_path }}
 
-          # Check backend and variable files
+          # Validate backend and variable files
           if [ ! -f "backend-config/${{ github.event.client_payload.environment }}.tfbackend" ]; then
             echo "❌ Missing backend config: backend-config/${{ github.event.client_payload.environment }}.tfbackend"
             exit 1
@@ -55,23 +55,59 @@ jobs:
 
       - name: Terraform Validate
         run: |
+          echo "🔍 Validating Terraform configuration..."
           terraform validate
+          echo "✅ Validation passed!"
         working-directory: ${{ github.event.client_payload.repo_path }}
 
       - name: Terraform Plan
         run: |
           echo "📋 Running Terraform plan..."
+
+          # Allow plan to exit with non-zero without breaking the workflow
+          set +e
           terraform plan \
             -var-file="static.tfvars" \
             -var-file="envs/${{ github.event.client_payload.environment }}.tfvars" \
             -out=tfplan.out
-          echo "✅ Terraform plan completed successfully."
+          PLAN_EXIT_CODE=$?
+          set -e
+
+          echo "🔍 Terraform plan exited with code: $PLAN_EXIT_CODE"
+
+          # Handle exit codes properly
+          case $PLAN_EXIT_CODE in
+            0)
+              echo "✅ No infrastructure changes required."
+              ;;
+            2)
+              echo "⚙️ Infrastructure changes detected — will apply them next."
+              ;;
+            1)
+              echo "❌ Terraform plan failed!"
+              exit 1
+              ;;
+            *)
+              echo "⚠️ Unexpected Terraform plan exit code: $PLAN_EXIT_CODE"
+              exit 1
+              ;;
+          esac
+
+          # Save plan exit code to a file for next step
+          echo "$PLAN_EXIT_CODE" > plan_exit_code.txt
         working-directory: ${{ github.event.client_payload.repo_path }}
 
       - name: Terraform Apply
         run: |
           echo "🚀 Applying Terraform changes..."
           export TF_LOG=INFO
+
+          PLAN_EXIT_CODE=$(cat plan_exit_code.txt)
+          if [ "$PLAN_EXIT_CODE" -eq 0 ]; then
+            echo "✅ No changes to apply. Skipping terraform apply."
+            exit 0
+          fi
+
           terraform apply -auto-approve tfplan.out
           echo "✅ Terraform apply completed successfully!"
         working-directory: ${{ github.event.client_payload.repo_path }}
