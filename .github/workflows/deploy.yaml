@@ -4,6 +4,7 @@ on:
   repository_dispatch:
     types: [bootstrap_completed]
 
+
 jobs:
   terraform:
     runs-on: [self-hosted, linux, x64]
