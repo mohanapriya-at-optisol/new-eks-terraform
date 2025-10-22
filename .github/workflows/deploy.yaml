@@ -15,6 +15,13 @@ jobs:
       TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
 
       - name: Verify AWS Credentials
         run: |
@@ -63,7 +70,6 @@ jobs:
         run: |
           echo "📋 Running Terraform plan..."
           terraform plan \
-            -var-file="static.tfvars"\
             -var-file="envs/${{ github.event.client_payload.environment }}.tfvars" \
             -out=tfplan.out \
             -detailed-exitcode
@@ -72,10 +78,27 @@ jobs:
       - name: Terraform Apply
         run: |
           echo "🚀 Applying Terraform changes..."
-          terraform apply \
-            tfplan.out\
-            --auto-approve
+          set -e
+          
+          # Enable detailed logging
+          export TF_LOG=INFO
+          
+          # Run terraform apply with better error handling
+          if ! terraform apply \
+            -auto-approve \
+            -parallelism=10 \
+            tfplan.out; then
+            echo "❌ Terraform apply failed!"
+            echo "📋 Checking Terraform state..."
+            terraform state list || true
+            echo "📋 Last few lines of terraform log:"
+            tail -50 terraform.log || true
+            exit 1
+          fi
+          
+          echo "✅ Terraform apply completed successfully!"
         working-directory: ${{ github.event.client_payload.repo_path }}
+        timeout-minutes: 60
 
       - name: Output EKS Cluster Info
         run: |
