@@ -4,7 +4,6 @@ on:
   repository_dispatch:
     types: [bootstrap_completed]
 
-
 jobs:
   terraform:
     runs-on: [self-hosted, linux, x64]
@@ -82,17 +81,7 @@ jobs:
           echo "🎉 EKS Cluster deployment completed!"
           echo "📊 Terraform outputs:"
           terraform output
-          
-          # Save outputs to file
-          terraform output -json > cluster-outputs.json
-          echo "💾 Outputs saved to cluster-outputs.json"
         working-directory: ${{ github.event.client_payload.repo_path }}
-
-      - name: Upload Terraform Outputs
-        uses: actions/upload-artifact@v4
-        with:
-          name: terraform-outputs-${{ github.event.client_payload.environment }}
-          path: ${{ github.event.client_payload.repo_path }}/cluster-outputs.json
 
       - name: Deployment Summary
         run: |
@@ -103,6 +92,7 @@ jobs:
           echo "- **Status:** ✅ Successfully deployed" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Terraform Outputs" >> $GITHUB_STEP_SUMMARY
-          echo '```json' >> $GITHUB_STEP_SUMMARY
-          cat ${{ github.event.client_payload.repo_path }}/cluster-outputs.json >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
+          terraform output >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        working-directory: ${{ github.event.client_payload.repo_path }}
