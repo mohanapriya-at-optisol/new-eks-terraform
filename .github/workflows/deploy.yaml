@@ -15,6 +15,11 @@ jobs:
       TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
 
     steps:
+      - name: Verify Project Directory
+        run: |
+          echo "📂 Verifying project directory: ${{ github.event.client_payload.repo_path }}"
+          ls -la ${{ github.event.client_payload.repo_path }}
+          echo "✅ Project directory verified"
 
       - name: Verify AWS Credentials
         run: |
@@ -39,11 +44,22 @@ jobs:
             exit 1
           fi
           
+          # Check if static vars file exists
+          if [ ! -f "static.tfvars" ]; then
+            echo "❌ Static vars file not found: static.tfvars"
+            exit 1
+          fi
+          
           # Check if environment vars file exists
           if [ ! -f "envs/${{ github.event.client_payload.environment }}.tfvars" ]; then
             echo "❌ Environment vars file not found: envs/${{ github.event.client_payload.environment }}.tfvars"
             exit 1
           fi
+          
+          echo "✅ All required files found:"
+          echo "   - Backend config: backend-config/${{ github.event.client_payload.environment }}.tfbackend"
+          echo "   - Static vars: static.tfvars"
+          echo "   - Environment vars: envs/${{ github.event.client_payload.environment }}.tfvars"
           
           # Re-initialize terraform (needed because this is a fresh CI environment)
           terraform init -backend-config="backend-config/${{ github.event.client_payload.environment }}.tfbackend"
@@ -62,8 +78,15 @@ jobs:
       - name: Terraform Plan
         run: |
           echo "📋 Running Terraform plan..."
+          
+          # Check if static.tfvars exists
+          if [ ! -f "static.tfvars" ]; then
+            echo "❌ Static vars file not found: static.tfvars"
+            exit 1
+          fi
+          
           terraform plan \
-            -var-file="static.tfvars"
+            -var-file="static.tfvars" \
             -var-file="envs/${{ github.event.client_payload.environment }}.tfvars" \
             -out=tfplan.out \
             -detailed-exitcode
