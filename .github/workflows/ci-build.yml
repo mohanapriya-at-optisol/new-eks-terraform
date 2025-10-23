@@ -38,6 +38,17 @@ jobs:
           ls -la
         working-directory: ${{ github.workspace }}
 
+      - name: Install Terraform
+        run: |
+          if ! command -v terraform &> /dev/null; then
+            wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+            echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+            sudo apt update && sudo apt install terraform
+            echo "✅ Terraform installed"
+          else
+            echo "✅ Terraform already installed: $(terraform version)"
+          fi
+
       - name: Ensure tf-admin AWS profile
         run: |
           if aws configure list-profiles | grep -q '^tf-admin$'; then
@@ -58,8 +69,25 @@ jobs:
 
       - name: Run Bootstrap Script
         run: |
-          chmod +x setup-backend.sh
-          ./setup-backend.sh
+          chmod +x setup-backend-noninteractive.sh
+          ./setup-backend-noninteractive.sh
+        working-directory: terraform-eks
+
+      - name: Check Terraform Initialization
+        run: |
+          if [ ! -d ".terraform" ] || [ ! -f ".terraform/terraform.tfstate" ]; then
+            echo "Terraform not initialized, running init..."
+            terraform init -backend-config="backend-config/${{ secrets.TF_ENVIRONMENT }}.tfbackend"
+          else
+            echo "✅ Terraform already initialized"
+          fi
+          
+          # Ensure correct workspace
+          CURRENT_WORKSPACE=$(terraform workspace show)
+          if [ "$CURRENT_WORKSPACE" != "${{ secrets.TF_ENVIRONMENT }}" ]; then
+            terraform workspace select ${{ secrets.TF_ENVIRONMENT }} || \
+            terraform workspace new ${{ secrets.TF_ENVIRONMENT }}
+          fi
         working-directory: terraform-eks
 
       - name: Terraform Validate
