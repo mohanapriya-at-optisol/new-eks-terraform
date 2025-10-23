@@ -52,6 +52,14 @@ jobs:
             echo "✅ tf-admin profile created successfully."
           fi
 
+      - name: Debug environment variables
+        run: |
+          echo "💡 Environment: $GITHUB_ENVIRONMENT"
+          echo "💡 Region: $GITHUB_REGION"
+          echo "💡 AWS Profile: $GITHUB_AWS_PROFILE"
+          echo "💡 TF Bucket: $GITHUB_TF_BUCKET"
+          echo "💡 DynamoDB Table: $GITHUB_TF_DDB_TABLE"
+
       - name: Run Bootstrap Script
         run: |
           chmod +x setup-backend.sh
@@ -76,13 +84,7 @@ jobs:
           GITHUB_DESIRED_SIZE: ${{ secrets.TF_DESIRED_SIZE }}
           GITHUB_DISK_SIZE: ${{ secrets.TF_DISK_SIZE }}
           GITHUB_PROJECT_NAME: ${{ secrets.TF_PROJECT_NAME }}
-      - name: Debug environment variables
-        run: |
-          echo "💡 Environment: $GITHUB_ENVIRONMENT"
-          echo "💡 Region: $GITHUB_REGION"
-          echo "💡 AWS Profile: $GITHUB_AWS_PROFILE"
-          echo "💡 TF Bucket: $GITHUB_TF_BUCKET"
-          echo "💡 DynamoDB Table: $GITHUB_TF_DDB_TABLE"
+      
 
       - name: Terraform Validate
         run: terraform validate
