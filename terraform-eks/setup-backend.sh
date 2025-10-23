@@ -60,6 +60,8 @@ AWS_REGION="${GITHUB_REGION}"
 AWS_PROFILE="${GITHUB_AWS_PROFILE:-default}"
 TF_BUCKET="${GITHUB_TF_BUCKET}"
 TF_DDB_TABLE="${GITHUB_TF_DDB_TABLE}"
+echo "Using S3 bucket: $TF_BUCKET"
+echo "Using DB Table: $TF_DDB_TABLE"
 
 if [ -z "$ENVIRONMENT" ] || [ -z "$AWS_REGION" ]; then
   echo "❌ Missing required GitHub secrets: GITHUB_ENVIRONMENT or GITHUB_REGION"
