@@ -16,7 +16,7 @@ jobs:
       # Terraform / bootstrap variables from GitHub secrets
       GITHUB_ENVIRONMENT: ${{ secrets.TF_ENVIRONMENT }}
       GITHUB_REGION: ${{ secrets.AWS_REGION }}
-      GITHUB_AWS_PROFILE: ${{secrets.AWS_PROFILE}}
+      GITHUB_AWS_PROFILE: ${{ secrets.AWS_PROFILE }}
       GITHUB_TF_BUCKET: ${{ secrets.TF_S3_BUCKET }}
       GITHUB_TF_DDB_TABLE: ${{ secrets.TF_DDB_TABLE }}
       GITHUB_CLUSTER_NAME: ${{ secrets.TF_CLUSTER_NAME }}
@@ -34,7 +34,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Navigate to Terraform directory
+      - name: Navigate to Terraform Directory
         run: |
           cd terraform-eks
           pwd
@@ -61,6 +61,21 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+          GITHUB_ENVIRONMENT: ${{ secrets.TF_ENVIRONMENT }}
+          GITHUB_REGION: ${{ secrets.AWS_REGION }}
+          GITHUB_AWS_PROFILE: ${{ secrets.AWS_PROFILE }}
+          GITHUB_TF_BUCKET: ${{ secrets.TF_S3_BUCKET }}
+          GITHUB_TF_DDB_TABLE: ${{ secrets.TF_DDB_TABLE }}
+          GITHUB_CLUSTER_NAME: ${{ secrets.TF_CLUSTER_NAME }}
+          GITHUB_CLUSTER_VERSION: ${{ secrets.CLUSTER_VERSION }}
+          GITHUB_VPC_CIDR: ${{ secrets.TF_VPC_CIDR }}
+          GITHUB_NODE_GROUP_NAME: ${{ secrets.TF_NODE_GROUP_NAME }}
+          GITHUB_INSTANCE_TYPE: ${{ secrets.TF_NODE_INSTANCE_TYPE }}
+          GITHUB_MIN_SIZE: ${{ secrets.TF_MIN_SIZE }}
+          GITHUB_MAX_SIZE: ${{ secrets.TF_MAX_SIZE }}
+          GITHUB_DESIRED_SIZE: ${{ secrets.TF_DESIRED_SIZE }}
+          GITHUB_DISK_SIZE: ${{ secrets.TF_DISK_SIZE }}
+          GITHUB_PROJECT_NAME: ${{ secrets.TF_PROJECT_NAME }}
 
       - name: Terraform Validate
         run: terraform validate
@@ -70,7 +85,7 @@ jobs:
         run: |
           terraform plan \
             -var-file="static.tfvars" \
-            -var-file="envs/${{ secrets.ENVIRONMENT }}.tfvars" \
+            -var-file="envs/${{ secrets.TF_ENVIRONMENT }}.tfvars" \
             -out=tfplan.out
         working-directory: terraform-eks
 
