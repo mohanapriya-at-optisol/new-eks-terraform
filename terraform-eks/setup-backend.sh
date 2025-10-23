@@ -3,6 +3,13 @@
 # Exit on error
 set -e
 
+if [ -f .env ]; then
+  echo "📦  Loading environment variables from .env file..."
+  source .env
+else
+  echo "⚠️  No .env file found, make sure environment variables are set manually."
+fi
+
 # Track created resources for cleanup
 CREATED_BUCKET=""
 CREATED_DDB_TABLE=""
@@ -166,7 +173,7 @@ if [ ! -f "$ENV_VARS_FILE" ]; then
   PROJECT_NAME="${USER_PROJECT_NAME:-eks-karpenter}"
 
   cat > "$ENV_VARS_FILE" <<EOF
-aws_region = "${VARS_REGION}"
+region_name = "${VARS_REGION}"
 cluster_version = "1.31"
 vpc_cidr = "${VPC_CIDR}"
 azs = ["${VARS_REGION}a", "${VARS_REGION}b", "${VARS_REGION}c"]
@@ -464,3 +471,24 @@ echo ""
 echo "🎉 Setup completed successfully!"
 echo "Terraform is now configured to use the '${ENVIRONMENT}' workspace."
 echo "You can now run 'terraform plan' or 'terraform apply' to manage your infrastructure."
+
+
+# Prompt for GitHub repo path if not set
+if [ -z "$GITHUB_REPO_PATH" ]; then
+  read -r -p "Enter the local path to your GitHub repository (e.g., /home/ubuntu/project/eks-terraform/terraform-eks): " GITHUB_REPO_PATH
+fi
+
+# Trigger GitHub Actions if credentials are available
+if [ -n "$GITHUB_TOKEN" ] && [ -n "$GITHUB_USERNAME" ] && [ -n "$GITHUB_REPO" ]; then
+  echo "🚀 Triggering GitHub Actions for environment '${ENVIRONMENT}'..."
+  curl -X POST \
+    -H "Accept: application/vnd.github+json" \
+    -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+    "https://api.github.com/repos/${GITHUB_USERNAME}/${GITHUB_REPO}/dispatches" \
+    -d "$(jq -n \
+          --arg env "$ENVIRONMENT" \
+          --arg path "$GITHUB_REPO_PATH" \
+          '{event_type:"bootstrap_completed", client_payload:{environment:$env, repo_path:$path}}')"
+else
+  echo "⚠️ Skipping GitHub Actions trigger — missing GITHUB_TOKEN, GITHUB_USERNAME, or GITHUB_REPO environment variables."
+fi
