@@ -58,8 +58,8 @@ jobs:
 
       - name: Run Bootstrap Script
         run: |
-          chmod +x setup-backend-noninteractive.sh
-          ./setup-backend-noninteractive.sh
+          chmod +x setup-backend.sh
+          ./setup-backend.sh
         working-directory: terraform-eks
 
       - name: Terraform Validate
