@@ -1,20 +1,75 @@
-name: Sync Code Updates to Self-Hosted Runner
+name: Update Only Last Committed File
 
 on:
   push:
     branches:
-      - main
-
+      - main  # change this to your branch if needed
 
 jobs:
-  sync:
+  update-committed-file:
     runs-on: [self-hosted, linux, x64]
 
     steps:
-      # 1️⃣ Checkout entire repo
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # get full history so git diff works correctly
+      # 1️⃣ Show the runner workspace
+      - name: Show runner workspace
+        run: |
+          echo "Runner workspace: $GITHUB_WORKSPACE"
 
-      
+      # 2️⃣ Ensure repository exists in target directory
+      - name: Ensure repository exists
+        run: |
+          TARGET_DIR="$GITHUB_WORKSPACE/eks-terraform"  # Change this to your existing code path
+          echo "Target directory: $TARGET_DIR"
+          
+          if [ ! -d "$TARGET_DIR/.git" ]; then
+            echo "First run detected: cloning the repository..."
+            git clone https://github.com/${{ github.repository }} "$TARGET_DIR"
+          else
+            echo "Repository already exists at $TARGET_DIR"
+          fi
+
+      # 3️⃣ Get last committed files
+      - name: Get last committed files
+        id: last_commit
+        run: |
+          cd "$GITHUB_WORKSPACE/eks-terraform"
+          echo "Detecting last commit files..."
+          LAST_COMMIT=$(git rev-parse HEAD)
+          echo "Last commit SHA: $LAST_COMMIT"
+
+          CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r $LAST_COMMIT)
+          echo "Files changed in last commit:"
+          echo "$CHANGED_FILES"
+
+          echo "changed_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      # 4️⃣ Update only the last committed files in existing directory
+      - name: Update changed files in existing directory
+        run: |
+          TARGET_DIR="$GITHUB_WORKSPACE/eks-terraform"
+          echo "Updating files in $TARGET_DIR"
+
+          cd "$TARGET_DIR"
+          echo "${{ steps.last_commit.outputs.changed_files }}" | while read file; do
+            if [ -n "$file" ]; then
+              echo "Updating: $file"
+              mkdir -p "$(dirname "$file")"
+              git show HEAD:"$file" > "$file"
+            fi
+          done
+
+          echo "✅ Updated only the last committed files in $TARGET_DIR"
+
+      # 5️⃣ Summary
+      - name: Summary
+        run: |
+          TARGET_DIR="$GITHUB_WORKSPACE/eks-terraform"
+          echo "## 🧩 Code Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- Repository: ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Updated folder: $TARGET_DIR" >> $GITHUB_STEP_SUMMARY
+          echo "- Changed files:" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.last_commit.outputs.changed_files }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
