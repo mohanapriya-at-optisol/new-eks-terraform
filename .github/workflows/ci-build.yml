@@ -34,7 +34,7 @@ jobs:
       # 3️⃣ Sync changes to runner project directory
       - name: Sync changed files to project folder
         run: |
-          PROJECT_DIR="/opt/github/projects/${{ github.repository }}"
+          PROJECT_DIR="/home/github/${{ github.repository }}"
           echo "📂 Target project directory: $PROJECT_DIR"
 
           # Create directory if first time
