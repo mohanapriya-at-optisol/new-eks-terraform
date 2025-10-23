@@ -10,6 +10,7 @@ nat_gateway = true
 single_nat_gateway = true
 one_nat_gateway_per_az = false
 enable_dns_support = true
+enable_efs_storage = true
 node_group_name = "eks-karpenter-mng"
 cluster_name = "dev-new-eks-karpenter"
 environment = "dev"
