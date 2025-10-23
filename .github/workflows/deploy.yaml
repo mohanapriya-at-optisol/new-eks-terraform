@@ -78,7 +78,7 @@ jobs:
         run: |
           echo "📋 Running Terraform plan..."
           terraform plan \
-            -var-file="/home/ubuntu/actions-runner/_work/eks-terraform/eks-terraform/eks-terraform/terraform-eks/static.tfvars" \
+            -var-file="static.tfvars" \
             -var-file="envs/${{ github.event.client_payload.environment }}.tfvars" \
             -out=tfplan.out
           echo "✅ Terraform plan completed."
