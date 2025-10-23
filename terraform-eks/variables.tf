@@ -113,6 +113,9 @@ variable "karpenter_ttl_seconds_after_empty" {
 variable "tags" {
   type        = map(string)
 }
+variable "enable_efs_storage"{
+type = bool
+}
 
 
 
