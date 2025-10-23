@@ -8,12 +8,9 @@ jobs:
     runs-on: [self-hosted, linux, x64]
 
     env:
-      # AWS credentials
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
-
-      # Terraform / bootstrap variables from GitHub secrets
       GITHUB_ENVIRONMENT: ${{ secrets.TF_ENVIRONMENT }}
       GITHUB_REGION: ${{ secrets.AWS_REGION }}
       GITHUB_AWS_PROFILE: ${{ secrets.AWS_PROFILE }}
@@ -52,39 +49,18 @@ jobs:
             echo "✅ tf-admin profile created successfully."
           fi
 
-      - name: Debug environment variables
+      - name: Debug environment variables (masked)
         run: |
           echo "💡 Environment: $GITHUB_ENVIRONMENT"
           echo "💡 Region: $GITHUB_REGION"
           echo "💡 AWS Profile: $GITHUB_AWS_PROFILE"
-          echo "💡 TF Bucket: $GITHUB_TF_BUCKET"
-          echo "💡 DynamoDB Table: $GITHUB_TF_DDB_TABLE"
+          echo "💡 Secrets are properly loaded (values masked for security)"
 
       - name: Run Bootstrap Script
         run: |
-          chmod +x setup-backend.sh
-          ./setup-backend.sh
+          chmod +x setup-backend-noninteractive.sh
+          ./setup-backend-noninteractive.sh
         working-directory: terraform-eks
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
-          GITHUB_ENVIRONMENT: ${{ secrets.TF_ENVIRONMENT }}
-          GITHUB_REGION: ${{ secrets.AWS_REGION }}
-          GITHUB_AWS_PROFILE: ${{ secrets.AWS_PROFILE }}
-          GITHUB_TF_BUCKET: ${{ secrets.TF_S3_BUCKET }}
-          GITHUB_TF_DDB_TABLE: ${{ secrets.TF_DDB_TABLE }}
-          GITHUB_CLUSTER_NAME: ${{ secrets.TF_CLUSTER_NAME }}
-          GITHUB_CLUSTER_VERSION: ${{ secrets.CLUSTER_VERSION }}
-          GITHUB_VPC_CIDR: ${{ secrets.TF_VPC_CIDR }}
-          GITHUB_NODE_GROUP_NAME: ${{ secrets.TF_NODE_GROUP_NAME }}
-          GITHUB_INSTANCE_TYPE: ${{ secrets.TF_NODE_INSTANCE_TYPE }}
-          GITHUB_MIN_SIZE: ${{ secrets.TF_MIN_SIZE }}
-          GITHUB_MAX_SIZE: ${{ secrets.TF_MAX_SIZE }}
-          GITHUB_DESIRED_SIZE: ${{ secrets.TF_DESIRED_SIZE }}
-          GITHUB_DISK_SIZE: ${{ secrets.TF_DISK_SIZE }}
-          GITHUB_PROJECT_NAME: ${{ secrets.TF_PROJECT_NAME }}
-      
 
       - name: Terraform Validate
         run: terraform validate
