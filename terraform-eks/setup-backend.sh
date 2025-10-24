@@ -58,9 +58,9 @@ echo "✅ Region: $AWS_REGION"
 echo "✅ Profile: $AWS_PROFILE"
 # Don't echo bucket/table names as they might contain sensitive info
 
-# Validate AWS credentials
-if ! aws sts get-caller-identity --profile "$AWS_PROFILE" --region "$AWS_REGION" >/dev/null 2>&1; then
-  echo "❌ AWS credentials invalid"
+# Validate AWS credentials (fast check)
+if ! timeout 10 aws sts get-caller-identity --profile "$AWS_PROFILE" >/dev/null 2>&1; then
+  echo "❌ AWS credentials invalid or timeout"
   exit 1
 fi
 echo "✅ AWS credentials validated"
@@ -104,8 +104,8 @@ EOF
 CREATED_FILES+=("$ENV_VARS_FILE")
 echo "✅ Environment variables file created"
 
-# Check S3 bucket exists
-if aws s3api head-bucket --bucket "$TF_BUCKET" --region "$AWS_REGION" >/dev/null 2>&1; then
+# Check S3 bucket exists (with timeout)
+if timeout 15 aws s3api head-bucket --bucket "$TF_BUCKET" --region "$AWS_REGION" >/dev/null 2>&1; then
   echo "✅ S3 bucket already exists"
 else
   echo "Creating S3 bucket..."
@@ -118,8 +118,8 @@ else
   sleep 60
 fi
 
-# Check DynamoDB table exists
-if aws dynamodb describe-table --table-name "$TF_DDB_TABLE" --region "$AWS_REGION" >/dev/null 2>&1; then
+# Check DynamoDB table exists (with timeout)
+if timeout 15 aws dynamodb describe-table --table-name "$TF_DDB_TABLE" --region "$AWS_REGION" >/dev/null 2>&1; then
   echo "✅ DynamoDB table already exists"
 else
   echo "Creating DynamoDB table..."
@@ -134,13 +134,16 @@ else
   echo "✅ DynamoDB table created"
 fi
 
-# Initialize Terraform with module reuse
-export TF_PLUGIN_TIMEOUT=300
+# Initialize Terraform with speed optimizations
+export TF_PLUGIN_TIMEOUT=120
+export TF_PLUGIN_CACHE_DIR="$HOME/.terraform.d/plugin-cache"
+mkdir -p "$TF_PLUGIN_CACHE_DIR"
+
 if [ ! -d ".terraform" ]; then
-  echo "🚀 Initializing Terraform backend and plugins..."
-  terraform init -backend-config="$BACKEND_CONFIG_FILE"
+  echo "🚀 Initializing Terraform (fast mode)..."
+  terraform init -backend-config="$BACKEND_CONFIG_FILE" -upgrade=false -get=true
 else
-  echo "✅ Terraform already initialized, reusing existing modules and plugins"
+  echo "✅ Terraform already initialized, skipping"
 fi
 
 # Handle workspace
