@@ -139,7 +139,9 @@ export TF_PLUGIN_TIMEOUT=120
 export TF_PLUGIN_CACHE_DIR="$HOME/.terraform.d/plugin-cache"
 mkdir -p "$TF_PLUGIN_CACHE_DIR"
 
-if [ ! -d ".terraform" ]; then
+if [ "$SKIP_TF_INIT" = "true" ]; then
+  echo "⚡ Skipping Terraform init (SKIP_TF_INIT=true)"
+elif [ ! -d ".terraform" ]; then
   echo "🚀 Initializing Terraform (fast mode)..."
   terraform init -backend-config="$BACKEND_CONFIG_FILE" -upgrade=false -get=true
 else
