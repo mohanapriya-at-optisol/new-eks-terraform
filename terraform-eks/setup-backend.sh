@@ -90,6 +90,7 @@ azs = ["${AWS_REGION}a", "${AWS_REGION}b", "${AWS_REGION}c"]
 node_group_name = "${GITHUB_NODE_GROUP_NAME:-default}"
 cluster_name = "${ENVIRONMENT}-${GITHUB_CLUSTER_NAME:-eks-cluster}"
 environment = "${ENVIRONMENT}"
+enable_efs_storage = "GITHUB_ENABLE_EFS_STORAGE"
 node_instance_type = "${GITHUB_INSTANCE_TYPE:-t3.medium}"
 min_size = ${GITHUB_MIN_SIZE:-2}
 max_size = ${GITHUB_MAX_SIZE:-5}
