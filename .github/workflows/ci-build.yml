@@ -5,7 +5,7 @@ on:
 
 jobs:
   terraform:
-    runs-on: [self-hosted, linux, x64,label-1]
+    runs-on: [self-hosted, linux, x64,new-runner]
 
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
