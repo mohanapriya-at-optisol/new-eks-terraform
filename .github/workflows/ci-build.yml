@@ -1,11 +1,11 @@
-name: Terraform Deploy Non Interactive
+name: Terraform Deploy Non-Interactive
 
 on:
   workflow_dispatch:
 
 jobs:
   terraform:
-    runs-on: [self-hosted, linux, x64,sample]
+    runs-on: [self-hosted, linux, x64]
 
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -28,16 +28,20 @@ jobs:
       GITHUB_PROJECT_NAME: ${{ secrets.TF_PROJECT_NAME }}
 
     steps:
+      # 1️⃣ Checkout repository
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # ensures full history for workspace operations
 
-      - name: Navigate to Terraform Directory
+      # 2️⃣ Show workspace info
+      - name: Show runner workspace
         run: |
-          cd terraform-eks
+          echo "Runner workspace: $GITHUB_WORKSPACE"
           pwd
           ls -la
-        working-directory: ${{ github.workspace }}
 
+      # 3️⃣ Ensure AWS profile exists
       - name: Ensure tf-admin AWS profile
         run: |
           if aws configure list-profiles | grep -q '^tf-admin$'; then
@@ -49,40 +53,49 @@ jobs:
             echo "✅ tf-admin profile created successfully."
           fi
 
-      - name: Debug environment variables (masked)
+      # 4️⃣ Debug environment variables (masked)
+      - name: Debug environment variables
         run: |
           echo "💡 Environment: $GITHUB_ENVIRONMENT"
           echo "💡 Region: $GITHUB_REGION"
           echo "💡 AWS Profile: $GITHUB_AWS_PROFILE"
-          echo "💡 Secrets are properly loaded (values masked for security)"
 
+      # 5️⃣ Run bootstrap script
       - name: Run Bootstrap Script
         run: |
           chmod +x setup-backend.sh
           ./setup-backend.sh
         working-directory: terraform-eks
 
-      - name: Check Terraform Initialization
+      # 6️⃣ Cache Terraform plugins and modules
+      - name: Cache Terraform
+        uses: actions/cache@v3
+        with:
+          path: |
+            terraform-eks/.terraform
+            ~/.terraform.d/plugin-cache
+          key: terraform-${{ runner.os }}-${{ env.GITHUB_ENVIRONMENT }}-${{ hashFiles('terraform-eks/**/*.tf*') }}
+          restore-keys: |
+            terraform-${{ runner.os }}-${{ env.GITHUB_ENVIRONMENT }}-
+
+      # 7️⃣ Conditional Terraform Init (only if not already initialized)
+      - name: Terraform Init (if required)
         run: |
+          cd terraform-eks
           if [ ! -d ".terraform" ] || [ ! -f ".terraform/terraform.tfstate" ]; then
-            echo "Terraform not initialized, running init..."
+            echo "🚀 Terraform not initialized. Running init..."
             terraform init -backend-config="backend-config/${{ secrets.TF_ENVIRONMENT }}.tfbackend"
           else
-            echo "✅ Terraform already initialized"
-          fi
-          
-          # Ensure correct workspace
-          CURRENT_WORKSPACE=$(terraform workspace show)
-          if [ "$CURRENT_WORKSPACE" != "${{ secrets.TF_ENVIRONMENT }}" ]; then
-            terraform workspace select ${{ secrets.TF_ENVIRONMENT }} || \
-            terraform workspace new ${{ secrets.TF_ENVIRONMENT }}
+            echo "✅ Terraform already initialized. Skipping init."
           fi
         working-directory: terraform-eks
 
+      # 8️⃣ Terraform Validate
       - name: Terraform Validate
         run: terraform validate
         working-directory: terraform-eks
 
+      # 9️⃣ Terraform Plan
       - name: Terraform Plan
         run: |
           terraform plan \
@@ -91,10 +104,12 @@ jobs:
             -out=tfplan.out
         working-directory: terraform-eks
 
+      # 🔟 Terraform Apply
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan.out
         working-directory: terraform-eks
 
+      # 1️⃣1️⃣ Output EKS Cluster Info
       - name: Output EKS Cluster Info
         run: terraform output
         working-directory: terraform-eks
