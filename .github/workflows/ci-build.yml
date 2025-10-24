@@ -118,8 +118,6 @@ jobs:
         run: |
           echo "Current Directory"
           pwd
-          cd terraform-eks
-          pwd
           terraform validate
 
       # 9️⃣ Terraform Plan
