@@ -1,14 +1,10 @@
 #!/bin/bash
 # Terraform Backend Bootstrap Script for GitHub Actions
-# Sets up:
-#   - S3 backend bucket with versioning, encryption, public access block
-#   - DynamoDB table for Terraform state locking
-#   - Waits for both to become fully ready
-#   - Creates Terraform backend config and workspace
+# Reuses plugins and avoids provider timeout issues
 set -euo pipefail
 
 # ------------------------------------------------------------------------------
-# 1️⃣ Load environment variables from GitHub Actions or use fallback defaults
+# 1️⃣ Load environment variables from GitHub Actions or defaults
 # ------------------------------------------------------------------------------
 TF_BUCKET="${GITHUB_TF_BUCKET:-my-tf-backend-bucket}"
 TF_DDB_TABLE="${GITHUB_TF_DDB_TABLE:-my-tf-lock-table}"
@@ -36,14 +32,8 @@ cleanup() {
   local exit_code=$?
   if [ $exit_code -ne 0 ]; then
     echo "⚠️ Script failed! Cleaning up created resources..."
-    if [ -n "$CREATED_BUCKET" ]; then
-      echo "🧹 Deleting S3 bucket: $CREATED_BUCKET"
-      aws s3 rb "s3://$CREATED_BUCKET" --force --region "$AWS_REGION" || true
-    fi
-    if [ -n "$CREATED_DDB_TABLE" ]; then
-      echo "🧹 Deleting DynamoDB table: $CREATED_DDB_TABLE"
-      aws dynamodb delete-table --table-name "$CREATED_DDB_TABLE" --region "$AWS_REGION" || true
-    fi
+    [ -n "$CREATED_BUCKET" ] && aws s3 rb "s3://$CREATED_BUCKET" --force --region "$AWS_REGION" || true
+    [ -n "$CREATED_DDB_TABLE" ] && aws dynamodb delete-table --table-name "$CREATED_DDB_TABLE" --region "$AWS_REGION" || true
   fi
 }
 trap cleanup EXIT
@@ -62,7 +52,7 @@ echo "✅ Profile: $AWS_PROFILE"
 echo ""
 
 # ------------------------------------------------------------------------------
-# 4️⃣ Ensure S3 bucket exists and is secure
+# 4️⃣ Ensure S3 bucket exists
 # ------------------------------------------------------------------------------
 if ! aws s3api head-bucket --bucket "$TF_BUCKET" --region "$AWS_REGION" >/dev/null 2>&1; then
   echo "🪣 Creating S3 bucket '$TF_BUCKET'..."
@@ -72,35 +62,21 @@ if ! aws s3api head-bucket --bucket "$TF_BUCKET" --region "$AWS_REGION" >/dev/nu
   CREATED_BUCKET="$TF_BUCKET"
   echo "✅ S3 bucket created"
 
-  # Apply best practices
-  aws s3api put-bucket-versioning \
-    --bucket "$TF_BUCKET" \
-    --versioning-configuration Status=Enabled \
-    --region "$AWS_REGION"
-  aws s3api put-bucket-encryption \
-    --bucket "$TF_BUCKET" \
-    --server-side-encryption-configuration '{
+  aws s3api put-bucket-versioning --bucket "$TF_BUCKET" --versioning-configuration Status=Enabled --region "$AWS_REGION"
+  aws s3api put-bucket-encryption --bucket "$TF_BUCKET" --server-side-encryption-configuration '{
       "Rules": [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]
-    }' \
-    --region "$AWS_REGION"
-  aws s3api put-public-access-block \
-    --bucket "$TF_BUCKET" \
-    --public-access-block-configuration '{
+    }' --region "$AWS_REGION"
+  aws s3api put-public-access-block --bucket "$TF_BUCKET" --public-access-block-configuration '{
       "BlockPublicAcls": true,
       "IgnorePublicAcls": true,
       "BlockPublicPolicy": true,
       "RestrictPublicBuckets": true
-    }' \
-    --region "$AWS_REGION"
+    }' --region "$AWS_REGION"
 
-  # Wait for bucket propagation
   echo "⏳ Waiting for S3 bucket to be fully available..."
   for i in {1..10}; do
-    if aws s3api head-bucket --bucket "$TF_BUCKET" --region "$AWS_REGION" >/dev/null 2>&1; then
-      echo "✅ S3 bucket is now available."
-      break
-    fi
-    echo "⌛ Still waiting for S3 bucket... retry $i/10"
+    aws s3api head-bucket --bucket "$TF_BUCKET" --region "$AWS_REGION" && break
+    echo "⌛ Waiting for S3 bucket... retry $i/10"
     sleep 5
   done
 else
@@ -109,10 +85,10 @@ fi
 echo ""
 
 # ------------------------------------------------------------------------------
-# 5️⃣ Ensure DynamoDB table exists and ready for state locking
+# 5️⃣ Ensure DynamoDB table exists
 # ------------------------------------------------------------------------------
 if ! aws dynamodb describe-table --table-name "$TF_DDB_TABLE" --region "$AWS_REGION" >/dev/null 2>&1; then
-  echo "🧱 Creating DynamoDB table '$TF_DDB_TABLE' for Terraform state locking..."
+  echo "🧱 Creating DynamoDB table '$TF_DDB_TABLE'..."
   aws dynamodb create-table \
     --table-name "$TF_DDB_TABLE" \
     --attribute-definitions AttributeName=LockID,AttributeType=S \
@@ -129,7 +105,7 @@ fi
 echo ""
 
 # ------------------------------------------------------------------------------
-# 6️⃣ Create backend config file for Terraform
+# 6️⃣ Create Terraform backend config
 # ------------------------------------------------------------------------------
 mkdir -p backend-config
 BACKEND_CONFIG_FILE="backend-config/${ENVIRONMENT}.tfbackend"
@@ -143,7 +119,7 @@ EOF
 echo "✅ Backend config file created: $BACKEND_CONFIG_FILE"
 
 # ------------------------------------------------------------------------------
-# 7️⃣ Create environment variables file for Terraform
+# 7️⃣ Create environment variables for Terraform
 # ------------------------------------------------------------------------------
 mkdir -p envs
 ENV_VARS_FILE="envs/${ENVIRONMENT}.tfvars"
@@ -168,13 +144,18 @@ EOF
 echo "✅ Environment variables file created: $ENV_VARS_FILE"
 
 # ------------------------------------------------------------------------------
-# 8️⃣ Initialize Terraform
+# 8️⃣ Initialize Terraform with plugin reuse and timeout
 # ------------------------------------------------------------------------------
-echo "🚀 Initializing Terraform backend..."
-terraform init -backend-config="$BACKEND_CONFIG_FILE"
+export TF_PLUGIN_TIMEOUT=300  # 5 minutes for slow provider startup
+if [ ! -d ".terraform" ]; then
+  echo "🚀 Initializing Terraform backend and plugins..."
+  terraform init -backend-config="$BACKEND_CONFIG_FILE"
+else
+  echo "✅ Terraform already initialized, reusing existing plugins."
+fi
 
 # ------------------------------------------------------------------------------
-# 9️⃣ Ensure correct Terraform workspace
+# 9️⃣ Select or create workspace
 # ------------------------------------------------------------------------------
 WORKSPACE_EXISTS=$(terraform workspace list | grep -w "$ENVIRONMENT" || true)
 if [ -z "$WORKSPACE_EXISTS" ]; then
