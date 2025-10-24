@@ -114,7 +114,10 @@ jobs:
 
       # 8️⃣ Terraform Validate
       - name: Terraform Validate
-        run: terraform -chdir=terraform-eks validate
+        run: |
+          echo "Current Directory"
+          pwd
+          terraform validate
 
       # 9️⃣ Terraform Plan
       - name: Terraform Plan
