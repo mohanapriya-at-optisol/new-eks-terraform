@@ -118,19 +118,24 @@ jobs:
         run: |
           echo "Current Directory"
           pwd
+          cd terraform-eks
+          pwd
           terraform validate
 
       # 9️⃣ Terraform Plan
       - name: Terraform Plan
         run: |
-          terraform -chdir=terraform-eks plan \
+          pwd
+          terraform plan \
             -var-file="static.tfvars" \
             -var-file="envs/${{ env.GITHUB_ENVIRONMENT }}.tfvars" \
             -out=tfplan.out
 
       # 🔟 Terraform Apply
       - name: Terraform Apply
-        run: terraform -chdir=terraform-eks apply -auto-approve tfplan.out
+        run: |
+          pwd
+          terraform apply -auto-approve tfplan.out
 
       # 1️⃣1️⃣ Output Terraform
       - name: Terraform Output
