@@ -26,6 +26,7 @@ jobs:
       GITHUB_DESIRED_SIZE: ${{ secrets.TF_DESIRED_SIZE }}
       GITHUB_DISK_SIZE: ${{ secrets.TF_DISK_SIZE }}
       GITHUB_PROJECT_NAME: ${{ secrets.TF_PROJECT_NAME }}
+      GITHUB_ENABLE_EFS_STORAGE: ${{secrets.ENABLE_EFS_STORAGE}}
 
     steps:
       # 1️⃣ Checkout repository
