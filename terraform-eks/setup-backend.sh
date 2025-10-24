@@ -1,126 +1,122 @@
 #!/bin/bash
 
-set -e
+# 🚀 Terraform Backend Setup Script
+# Sets up:
+#   - S3 backend bucket with encryption, versioning, and public access block
+#   - DynamoDB table for Terraform state locking
+#   - Waits for both to become fully ready before running terraform init
 
-# Track created resources for cleanup
+set -euo pipefail
+
+# ------------------------------------------------------------------------------
+# 1️⃣ Load environment variables
+# ------------------------------------------------------------------------------
+if [ -f .env ]; then
+  echo "📦 Loading environment variables from .env file..."
+  source .env
+else
+  echo "❌ .env file not found! Please create one with TF_BUCKET, TF_DDB_TABLE, AWS_REGION."
+  exit 1
+fi
+
+# ------------------------------------------------------------------------------
+# 2️⃣ Validate required variables
+# ------------------------------------------------------------------------------
+: "${TF_BUCKET:?TF_BUCKET not set}"
+: "${TF_DDB_TABLE:?TF_DDB_TABLE not set}"
+: "${AWS_REGION:?AWS_REGION not set}"
+
+AWS_PROFILE="${AWS_PROFILE:-default}"
+ENVIRONMENT="${ENVIRONMENT:-dev}"
+
+# ------------------------------------------------------------------------------
+# 3️⃣ Track created resources for cleanup
+# ------------------------------------------------------------------------------
 CREATED_BUCKET=""
 CREATED_DDB_TABLE=""
-CREATED_FILES=()
 
 cleanup() {
   local exit_code=$?
-  
-  if [ $exit_code -eq 0 ]; then
-    CREATED_BUCKET=""
-    CREATED_DDB_TABLE=""
-    CREATED_FILES=()
-    return
+  if [ $exit_code -ne 0 ]; then
+    echo "⚠️ Script failed! Cleaning up created resources..."
+    if [ -n "$CREATED_BUCKET" ]; then
+      echo "🧹 Deleting S3 bucket: $CREATED_BUCKET"
+      aws s3 rb "s3://$CREATED_BUCKET" --force --region "$AWS_REGION" || true
+    fi
+    if [ -n "$CREATED_DDB_TABLE" ]; then
+      echo "🧹 Deleting DynamoDB table: $CREATED_DDB_TABLE"
+      aws dynamodb delete-table --table-name "$CREATED_DDB_TABLE" --region "$AWS_REGION" || true
+    fi
   fi
-
-  echo "⚠️ Script failed! Cleaning up created resources..."
-
-  if [ -n "$CREATED_BUCKET" ]; then
-    aws s3 rm "s3://$CREATED_BUCKET" --recursive >/dev/null 2>&1 || true
-    aws s3api delete-bucket --bucket "$CREATED_BUCKET" --region "$AWS_REGION" >/dev/null 2>&1 || true
-    echo "✅ S3 bucket deleted"
-  fi
-
-  if [ -n "$CREATED_DDB_TABLE" ]; then
-    aws dynamodb delete-table --table-name "$CREATED_DDB_TABLE" --region "$AWS_REGION" >/dev/null 2>&1 || true
-    echo "✅ DynamoDB table deleted"
-  fi
-
-  for file in "${CREATED_FILES[@]}"; do
-    [ -f "$file" ] && rm -f "$file" && echo "✅ File deleted"
-  done
-
-  exit $exit_code
 }
+trap cleanup EXIT
 
-trap cleanup SIGINT SIGTERM EXIT
-
-# Read from GitHub secrets (don't echo values - they're masked anyway)
-ENVIRONMENT="${GITHUB_ENVIRONMENT}"
-AWS_REGION="${GITHUB_REGION}"
-AWS_PROFILE="${GITHUB_AWS_PROFILE:-tf-admin}"
-TF_BUCKET="${GITHUB_TF_BUCKET}"
-TF_DDB_TABLE="${GITHUB_TF_DDB_TABLE}"
-
-# Validate required variables
-if [ -z "$ENVIRONMENT" ] || [ -z "$AWS_REGION" ] || [ -z "$TF_BUCKET" ] || [ -z "$TF_DDB_TABLE" ]; then
-  echo "❌ Missing required GitHub secrets"
-  echo "Required: GITHUB_ENVIRONMENT, GITHUB_REGION, GITHUB_TF_BUCKET, GITHUB_TF_DDB_TABLE"
-  exit 1
-fi
-
-echo "✅ Environment: $ENVIRONMENT"
-echo "✅ Region: $AWS_REGION"
-echo "✅ Profile: $AWS_PROFILE"
-# Don't echo bucket/table names as they might contain sensitive info
-
-# Validate AWS credentials
+# ------------------------------------------------------------------------------
+# 4️⃣ Validate AWS credentials
+# ------------------------------------------------------------------------------
 if ! aws sts get-caller-identity --profile "$AWS_PROFILE" --region "$AWS_REGION" >/dev/null 2>&1; then
-  echo "❌ AWS credentials invalid"
+  echo "❌ Invalid AWS credentials for profile '$AWS_PROFILE'"
   exit 1
 fi
 echo "✅ AWS credentials validated"
+echo "✅ Environment: $ENVIRONMENT"
+echo "✅ Region: $AWS_REGION"
+echo "✅ Profile: $AWS_PROFILE"
+echo ""
 
-# Create directories
-mkdir -p backend-config envs
-
-# Create backend config
-BACKEND_CONFIG_FILE="backend-config/${ENVIRONMENT}.tfbackend"
-if [ ! -f "$BACKEND_CONFIG_FILE" ]; then
-  cat > "$BACKEND_CONFIG_FILE" <<EOF
-bucket         = "${TF_BUCKET}"
-key            = "terraform.tfstate"
-region         = "${AWS_REGION}"
-dynamodb_table = "${TF_DDB_TABLE}"
-encrypt        = true
-EOF
-  CREATED_FILES+=("$BACKEND_CONFIG_FILE")
-  echo "✅ Backend config created"
-fi
-
-# Create environment variables file
-ENV_VARS_FILE="envs/${ENVIRONMENT}.tfvars"
-if [ ! -f "$ENV_VARS_FILE" ]; then
-  cat > "$ENV_VARS_FILE" <<EOF
-region_name = "${AWS_REGION}"
-cluster_version = "${GITHUB_CLUSTER_VERSION:-1.31}"
-vpc_cidr = "${GITHUB_VPC_CIDR:-10.0.0.0/16}"
-azs = ["${AWS_REGION}a", "${AWS_REGION}b", "${AWS_REGION}c"]
-node_group_name = "${GITHUB_NODE_GROUP_NAME:-default}"
-cluster_name = "${ENVIRONMENT}-${GITHUB_CLUSTER_NAME:-eks-cluster}"
-environment = "${ENVIRONMENT}"
-node_instance_type = "${GITHUB_INSTANCE_TYPE:-t3.medium}"
-min_size = ${GITHUB_MIN_SIZE:-2}
-max_size = ${GITHUB_MAX_SIZE:-5}
-desired_size = ${GITHUB_DESIRED_SIZE:-3}
-disk_size = ${GITHUB_DISK_SIZE:-50}
-tags = {
-  Environment = "${ENVIRONMENT}"
-  Project     = "${GITHUB_PROJECT_NAME:-eks-karpenter}"
-  ManagedBy   = "terraform"
-}
-EOF
-  CREATED_FILES+=("$ENV_VARS_FILE")
-  echo "✅ Environment variables file created"
-fi
-
-# Ensure S3 bucket exists
+# ------------------------------------------------------------------------------
+# 5️⃣ Ensure S3 bucket exists and is secured
+# ------------------------------------------------------------------------------
 if ! aws s3api head-bucket --bucket "$TF_BUCKET" --region "$AWS_REGION" >/dev/null 2>&1; then
-  echo "Creating S3 bucket..."
+  echo "🪣 Creating S3 bucket '$TF_BUCKET'..."
   CREATE_ARGS=(--bucket "$TF_BUCKET" --region "$AWS_REGION")
   [ "$AWS_REGION" != "us-east-1" ] && CREATE_ARGS+=(--create-bucket-configuration LocationConstraint="$AWS_REGION")
   aws s3api create-bucket "${CREATE_ARGS[@]}"
   CREATED_BUCKET="$TF_BUCKET"
   echo "✅ S3 bucket created"
-fi
 
-# Ensure DynamoDB table exists
+  echo "🔒 Applying S3 best practices..."
+  aws s3api put-bucket-versioning \
+    --bucket "$TF_BUCKET" \
+    --versioning-configuration Status=Enabled \
+    --region "$AWS_REGION"
+  aws s3api put-bucket-encryption \
+    --bucket "$TF_BUCKET" \
+    --server-side-encryption-configuration '{
+      "Rules": [{
+        "ApplyServerSideEncryptionByDefault": { "SSEAlgorithm": "AES256" }
+      }]
+    }' \
+    --region "$AWS_REGION"
+  aws s3api put-public-access-block \
+    --bucket "$TF_BUCKET" \
+    --public-access-block-configuration '{
+      "BlockPublicAcls": true,
+      "IgnorePublicAcls": true,
+      "BlockPublicPolicy": true,
+      "RestrictPublicBuckets": true
+    }' \
+    --region "$AWS_REGION"
+
+  echo "⏳ Waiting for S3 bucket to become fully available..."
+  for i in {1..10}; do
+    if aws s3api head-bucket --bucket "$TF_BUCKET" --region "$AWS_REGION" >/dev/null 2>&1; then
+      echo "✅ S3 bucket is now available."
+      break
+    fi
+    echo "⌛ Still waiting for S3 bucket... retry $i/10"
+    sleep 5
+  done
+else
+  echo "ℹ️ S3 bucket '$TF_BUCKET' already exists — skipping creation"
+fi
+echo ""
+
+# ------------------------------------------------------------------------------
+# 6️⃣ Ensure DynamoDB table exists and ready for state locking
+# ------------------------------------------------------------------------------
 if ! aws dynamodb describe-table --table-name "$TF_DDB_TABLE" --region "$AWS_REGION" >/dev/null 2>&1; then
-  echo "Creating DynamoDB table..."
+  echo "🧱 Creating DynamoDB table '$TF_DDB_TABLE' for Terraform state locking..."
   aws dynamodb create-table \
     --table-name "$TF_DDB_TABLE" \
     --attribute-definitions AttributeName=LockID,AttributeType=S \
@@ -128,14 +124,37 @@ if ! aws dynamodb describe-table --table-name "$TF_DDB_TABLE" --region "$AWS_REG
     --billing-mode PAY_PER_REQUEST \
     --region "$AWS_REGION"
   CREATED_DDB_TABLE="$TF_DDB_TABLE"
+  echo "⏳ Waiting for DynamoDB table to become ACTIVE..."
   aws dynamodb wait table-exists --table-name "$TF_DDB_TABLE" --region "$AWS_REGION"
-  echo "✅ DynamoDB table created"
+  echo "✅ DynamoDB table is active."
+else
+  echo "ℹ️ DynamoDB table '$TF_DDB_TABLE' already exists — skipping creation"
 fi
+echo ""
 
-# Initialize Terraform
+# ------------------------------------------------------------------------------
+# 7️⃣ Create backend config file for Terraform
+# ------------------------------------------------------------------------------
+mkdir -p backend-config
+BACKEND_CONFIG_FILE="backend-config/${ENVIRONMENT}.tfbackend"
+cat > "$BACKEND_CONFIG_FILE" <<EOF
+bucket         = "${TF_BUCKET}"
+key            = "terraform.tfstate"
+region         = "${AWS_REGION}"
+dynamodb_table = "${TF_DDB_TABLE}"
+encrypt        = true
+EOF
+echo "✅ Backend config file created: $BACKEND_CONFIG_FILE"
+
+# ------------------------------------------------------------------------------
+# 8️⃣ Initialize Terraform with backend
+# ------------------------------------------------------------------------------
+echo "🚀 Initializing Terraform backend..."
 terraform init -backend-config="$BACKEND_CONFIG_FILE"
 
-# Handle workspace
+# ------------------------------------------------------------------------------
+# 9️⃣ Confirm workspace setup
+# ------------------------------------------------------------------------------
 WORKSPACE_EXISTS=$(terraform workspace list | grep -w "$ENVIRONMENT" || true)
 if [ -z "$WORKSPACE_EXISTS" ]; then
   terraform workspace new "$ENVIRONMENT"
@@ -143,9 +162,17 @@ else
   terraform workspace select "$ENVIRONMENT"
 fi
 
-# Clear tracking variables
+# ------------------------------------------------------------------------------
+# ✅ Done
+# ------------------------------------------------------------------------------
 CREATED_BUCKET=""
 CREATED_DDB_TABLE=""
-CREATED_FILES=()
-
-echo "🎉 Bootstrap completed for environment '$ENVIRONMENT'"
+echo ""
+echo "🎉 Terraform backend setup completed successfully!"
+echo "----------------------------------------------"
+echo "S3 Bucket        : $TF_BUCKET"
+echo "DynamoDB Table   : $TF_DDB_TABLE"
+echo "Region           : $AWS_REGION"
+echo "Environment      : $ENVIRONMENT"
+echo "State Locking    : ✅ Enabled via DynamoDB"
+echo "----------------------------------------------"
