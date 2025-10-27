@@ -8,6 +8,7 @@ module "eks" {
   endpoint_public_access = var.enable_eks_public_access
   endpoint_private_access = var.enable_eks_private_access
   enable_cluster_creator_admin_permissions = var.enable_admin_permissions
+
   addons = {
     coredns                = {}
     eks-pod-identity-agent = {
@@ -26,7 +27,7 @@ module "eks" {
   enable_irsa = var.irsa
   
   # Custom KMS key alias to avoid conflicts
-  kms_key_aliases = ["${local.cluster_name}-kms-alias-version2"]
+  kms_key_aliases = ["${local.cluster_name}-${var.kms_alias}"]
   
   # Apply tags to EKS cluster
   tags = var.tags
@@ -46,39 +47,47 @@ module "eks" {
       # Apply tags to managed node group
       tags = merge(var.tags, {
         Name = "${var.cluster_name}-mng-nodes"
+        "k8s.io/cluster-autoscaler/node-template/label/karpenter.sh/discovery" = local.cluster_name
+        Environment = var.environment
       })
     }
   }
    security_group_tags = merge(var.tags, {
     "karpenter.sh/discovery" = local.cluster_name
     Name = "${var.cluster_name}-cluster-sg"
+    Environment = var.environment
   })
    security_group_additional_rules = {
-    ingress_nodes_ephemeral_ports_tcp = {
-      description                = "Nodes on ephemeral ports"
-      protocol                   = "tcp"
-      from_port                  = 1025
-      to_port                    = 65535
-      type                       = "ingress"
-      source_node_security_group = true
-    }
+  for rule in var.security_group_additional_rules :
+  rule.name => {
+    description                = rule.description
+    from_port                  = rule.from_port
+    to_port                    = rule.to_port
+    protocol                   = rule.protocol
+    type                       = rule.type
+    source_node_security_group = rule.source_node_security_group
+    cidr_blocks                = rule.cidr_blocks
   }
+}
+
    node_security_group_tags = merge(var.tags, {
     "karpenter.sh/discovery" = local.cluster_name
     Name = "${var.cluster_name}-node-sg"
+    Environment = var.environment
   })
- 
-  node_security_group_additional_rules = {
-    # Allow all traffic between nodes for services like CoreDNS and cross-pod communication
-    ingress_self_all = {
-      description = "Node to node all ports/protocols"
-      protocol    = "-1"
-      from_port   = 0
-      to_port     = 0
-      type        = "ingress"
-      self        = true
-    }
+ node_security_group_additional_rules = {
+  for rule in var.node_security_group_additional_rules :
+  rule.name => {
+    description          = rule.description
+    from_port            = rule.from_port
+    to_port              = rule.to_port
+    protocol             = rule.protocol
+    type                 = rule.type
+    self                 = rule.self
+    cidr_blocks          = rule.cidr_blocks
   }
+}
+
  
  
 }
