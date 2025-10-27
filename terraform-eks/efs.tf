@@ -1,42 +1,45 @@
 # EFS File System for EKS
-
-# Security Group for EFS
 resource "aws_security_group" "efs" {
-  name        = "${local.cluster_name}-efs-sg"
+  name        = "${local.cluster_name}-${var.efs_sg_name}"
   description = "Security group for EFS mount targets"
   vpc_id      = module.vpc.vpc_id
-
-  ingress {
-    description     = "NFS from EKS nodes"
-    from_port       = 2049
-    to_port         = 2049
-    protocol        = "tcp"
-    security_groups = [module.eks.node_security_group_id]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
 
   tags = {
     Name        = "${local.cluster_name}-efs-sg"
     Environment = var.environment
   }
 }
+resource "aws_security_group_rule" "efs_rules" {
+  for_each = {
+    for rule in var.efs_security_group_rules :
+    rule.name => rule
+  }
+
+  security_group_id = aws_security_group.efs.id
+  description        = each.value.description
+  type               = each.value.type
+  from_port          = each.value.from_port
+  to_port            = each.value.to_port
+  protocol           = each.value.protocol
+  cidr_blocks        = lookup(each.value, "cidr_blocks", [])
+  source_security_group_id = (
+    length(lookup(each.value, "security_groups", [])) > 0 ?
+    each.value.security_groups[0] :
+    null
+  )
+}
+
 
 # EFS File System
 resource "aws_efs_file_system" "eks" {
-  creation_token = "${local.cluster_name}-efs"
-  encrypted      = true
+  creation_token = "${local.cluster_name}-${var.efs_creation_token}"
+  encrypted      = var.encrypt_efs
 
-  performance_mode = "generalPurpose"
-  throughput_mode  = "bursting"
+  performance_mode = var.efs_performance
+  throughput_mode  = var.efs_throughput
 
   lifecycle_policy {
-    transition_to_ia = "AFTER_30_DAYS"
+    transition_to_ia = var.efs_transition_to_ia
   }
 
   tags = {
@@ -56,7 +59,7 @@ resource "aws_efs_mount_target" "eks" {
 
 # IAM Policy for EFS CSI Driver
 resource "aws_iam_policy" "efs_csi_driver" {
-  name        = "${local.cluster_name}-EFSCSIDriverPolicy"
+  name        = "${local.cluster_name}-${var.efs_policy_name}"
   description = "IAM policy for EFS CSI Driver"
 
   policy = jsonencode({
@@ -114,7 +117,7 @@ resource "aws_iam_policy" "efs_csi_driver" {
 
 # IAM Role for EFS CSI Driver
 resource "aws_iam_role" "efs_csi_driver" {
-  name = "${local.cluster_name}-efs-csi-driver-role"
+  name = "${local.cluster_name}-${var.efs_role_name}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -143,11 +146,11 @@ resource "aws_iam_role_policy_attachment" "efs_csi_driver" {
 
 # Install EFS CSI Driver via Helm
 resource "helm_release" "efs_csi_driver" {
-  name       = "${local.cluster_name}-aws-efs-csi-driver"
-  repository = "https://kubernetes-sigs.github.io/aws-efs-csi-driver/"
-  chart      = "aws-efs-csi-driver"
-  namespace  = "kube-system"
-  version    = "2.5.7"
+  name       = "${local.cluster_name}-${var.efs_csi_driver_name}"
+  repository = var.helm_efs_csi_repo
+  chart      = var.helm_efs_csi_charts
+  namespace  = var. efs_namespace
+  version    = var.helm_efs_version
 
   set {
     name  = "controller.serviceAccount.create"
@@ -173,15 +176,15 @@ resource "helm_release" "efs_csi_driver" {
 # Kubernetes StorageClass for EFS
 resource "kubernetes_storage_class" "efs" {
   metadata {
-    name = "efs-sc"
+    name = var.storage_class_name
   }
 
   storage_provisioner = "efs.csi.aws.com"
   
   parameters = {
-    provisioningMode = "efs-ap"
+    provisioningMode = var.provisioning_mode
     fileSystemId     = aws_efs_file_system.eks.id
-    directoryPerms   = "700"
+    directoryPerms   = var.directory_permission
   }
 
   depends_on = [helm_release.efs_csi_driver]
