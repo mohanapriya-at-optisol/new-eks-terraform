@@ -76,10 +76,10 @@ resource "kubernetes_service_account" "karpenter_sa" {
 resource "helm_release" "karpenter" {
   name             = "${var.environment}-karpenter"
   namespace        = local.karpenter_namespace
-  create_namespace = false
-  repository       = "https://charts.karpenter.sh"
-  chart            = "karpenter"
-  version          = "0.16.3"
+  create_namespace = var.helm_create_ns
+  repository       = var.karpenter_repo
+  chart            = var.helm_chart_name
+  version          = var.karpenter_version
  
   set {
     name  = "serviceAccount.create"
