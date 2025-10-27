@@ -14,19 +14,21 @@ module "vpc" {
   single_nat_gateway = var.single_nat_gateway
   one_nat_gateway_per_az = var.one_nat_gateway_per_az
   enable_dns_support   = var.enable_dns_support
-  private_subnet_names = ["${local.vpc_name}-priv-1", "${local.vpc_name}-priv-2", "${local.vpc_name}-priv-3"]
-  public_subnet_names  = ["${local.vpc_name}-pub-1", "${local.vpc_name}-pub-2", "${local.vpc_name}-pub-3"]
-  intra_subnet_names = ["${local.vpc_name}-intra-1", "${local.vpc_name}-intra-2", "${local.vpc_name}-intra-3"]
+
+  private_subnet_names = [for i in range(length(var.private_subnets_range)) : format("%s-%s-%d", local.vpc_name,var.private_subnet_name, i)]
+  public_subnet_names  = [for i in range(length(var.public_subnets_range)): format("%s-%s-%d", local.vpc_name,var.public_subnet_name, i)]
+  intra_subnet_names = [for i in range(length(var.intra_subnets_range)): format("%s-%s-%d", local.vpc_name,var.intra_subnet_name, i)]
  
   private_subnet_tags = {
     Tier                     = "private"
     "kubernetes.io/role/internal-elb" = "1"
     "karpenter.sh/discovery" = local.cluster_name
+    Environment = var.environment
   }
  
   public_subnet_tags = {
     Tier = "public"
     "kubernetes.io/role/elb" = "1"
- 
+     Environment = var.environment
   }
 }
