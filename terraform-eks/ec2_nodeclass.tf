@@ -6,7 +6,7 @@ resource "kubectl_manifest" "karpenter_provisioner" {
     apiVersion: karpenter.sh/v1alpha5
     kind: Provisioner
     metadata:
-      name: default
+      name: ${var.karpenter_provisioner_name}
     spec:
       requirements:
         - key: "karpenter.sh/capacity-type"
@@ -19,7 +19,7 @@ resource "kubectl_manifest" "karpenter_provisioner" {
         resources:
           cpu: ${var.karpenter_cpu_limit}
       providerRef:
-        name: default
+        name: ${var.karpenter_provider_ref_name}
       ttlSecondsAfterEmpty: ${var.karpenter_ttl_seconds_after_empty}
   YAML
 }
@@ -31,7 +31,7 @@ resource "kubectl_manifest" "karpenter_node_template" {
     apiVersion: karpenter.k8s.aws/v1alpha1
     kind: AWSNodeTemplate
     metadata:
-      name: default
+      name: ${var.karpenter_node_template_name}
     spec:
       subnetSelector:
         karpenter.sh/discovery: ${local.cluster_name}
@@ -40,5 +40,7 @@ resource "kubectl_manifest" "karpenter_node_template" {
       instanceProfile: ${module.eks_karpenter.instance_profile_name}
       tags:
         karpenter.sh/discovery: ${local.cluster_name}
+        Environment: ${var.environment}
+        Name: ${var.karpenter_node_template_name}
   YAML
 }
